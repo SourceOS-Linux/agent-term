@@ -45,7 +45,7 @@ AgentTerm treats every meaningful action as an event:
 - Slash Topics topic-scope, policy-membrane, and receipt events
 - Memory Mesh recall, writeback, and context-pack events
 - New Hope message, thread, claim, citation, receptor, membrane, and moderation events
-- Holmes casefile, investigation, synthesis, guardrail, and eval events
+- Holmes request/status/artifact correlation events, without redefining Holmes behavior
 - Sherlock Search search-packet and context-hydration events
 - MeshRush graph-view, diffusion, crystallization, trace, and graph-evidence events
 - GitHub issue and PR updates
@@ -83,7 +83,7 @@ AgentTerm should not collapse the SourceOS stack into one generic search agent.
 | Slash Topics | Governed signed topic scopes, policy membranes, search/knowledge scoping, replayable receipts |
 | Memory Mesh | Governed recall, writeback, context packs, memoryd runtime, LiteLLM/OpenCLAW memory integrations |
 | New Hope | Semantic runtime for messages, threads, claims, citations, entities, lenses, receptors, membranes, and moderation events |
-| Holmes | Language intelligence fabric for casefiles, retrieval, semantic graphs, investigation, synthesis, guardrails, and evals |
+| Holmes | External language-intelligence fabric; AgentTerm may request, display, correlate, and audit Holmes-owned work, but must not define it |
 | Sherlock Search | Discovery/search-packet surface and retrieval evidence engine |
 | Legacy Sherlock | Explicitly authorized, policy-gated username/social-network OSINT only |
 | MeshRush | Graph-native autonomous-agent runtime over typed hypergraph world-model views |
@@ -117,14 +117,15 @@ agent-term tail
 agent-term shell
 ```
 
-The first implementation stores events in SQLite and records governance-preserving events locally. Matrix network I/O, Sociosphere materialization, Prophet Workspace workroom APIs, Slash Topics membranes, Memory Mesh recall/writeback, New Hope semantic normalization, Holmes investigation, Sherlock Search hydration, MeshRush graph execution, cloudshell-fog session attach, AgentPlane bundle execution, and Policy Fabric admission are intentionally isolated behind adapter boundaries so the terminal, policy, event log, and registry can be hardened independently.
+The first implementation stores events in SQLite and records governance-preserving events locally. Matrix network I/O, Sociosphere materialization, Prophet Workspace workroom APIs, Slash Topics membranes, Memory Mesh recall/writeback, New Hope semantic normalization, Holmes request/status/artifact correlation, Sherlock Search hydration, MeshRush graph execution, cloudshell-fog session attach, AgentPlane bundle execution, and Policy Fabric admission are intentionally isolated behind adapter boundaries so the terminal, policy, event log, and registry can be hardened independently.
 
 ## Docs
 
 - [SourceOS control surface architecture](docs/architecture/sourceos-control-surface.md)
+- [Holmes integration boundary](docs/integration/holmes-boundary.md)
 - [Agent instructions](AGENTS.md)
 - [Example configuration](configs/agent-term.example.json)
 
 ## Repository status
 
-This is the seed implementation. It is intentionally small but runnable. The next step is to land the Matrix-room MVP, then bind Policy Fabric admission, Sociosphere workspace state, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh recall/writeback, New Hope semantic events, Holmes investigations, Sherlock Search packets, MeshRush graph events, cloudshell-fog session lifecycle, AgentPlane evidence flow, and Hermes/Codex/Claude Code/OpenCLAW participants under explicit operator permissions.
+This is the seed implementation. It is intentionally small but runnable. The next step is to land the Matrix-room MVP, then bind Policy Fabric admission, Sociosphere workspace state, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh recall/writeback, New Hope semantic events, Holmes request/status/artifact correlation, Sherlock Search packets, MeshRush graph events, cloudshell-fog session lifecycle, AgentPlane evidence flow, and Hermes/Codex/Claude Code/OpenCLAW participants under explicit operator permissions.

@@ -58,7 +58,7 @@ def test_sherlock_search_is_preferred_surface():
     assert "preferred" in " ".join(sherlock.notes).lower()
     assert legacy.repository == "SocioProphet/sherlock"
     assert "policy-gated" in legacy_contract
-    assert "ambient default" in legacy_contract
+    assert "default agent tool" in legacy_contract
 
 
 def test_side_effecting_capabilities_require_approval():

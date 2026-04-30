@@ -1,0 +1,89 @@
+{
+  "workspace": "sourceos",
+  "defaultChannel": "!sourceos-ops",
+  "eventStore": {
+    "driver": "sqlite",
+    "path": ".agent-term/events.sqlite3"
+  },
+  "matrix": {
+    "enabled": false,
+    "homeserverUrl": "https://matrix.example.org",
+    "userId": "@agent-term:example.org",
+    "deviceName": "agent-term-operator-console",
+    "rooms": {
+      "sourceosOps": "!sourceos-ops:example.org",
+      "sourceosBuild": "!sourceos-build:example.org",
+      "agentplane": "!agentplane:example.org",
+      "policyFabric": "!policyfabric:example.org",
+      "sherlockSearch": "!sherlock-search:example.org",
+      "ciFailures": "!ci-failures:example.org"
+    },
+    "requireEncryptedRoomPostureForSensitiveContext": true,
+    "preserveBridgeMetadata": true,
+    "preserveRedactions": true,
+    "preserveMembershipEvents": true
+  },
+  "planes": {
+    "cloudshellFog": {
+      "enabled": true,
+      "repository": "SocioProphet/cloudshell-fog",
+      "baseUrl": "http://localhost:8080",
+      "defaultProfile": "default",
+      "defaultTtlSeconds": 3600,
+      "requirePolicyApproval": true
+    },
+    "agentplane": {
+      "enabled": true,
+      "repository": "SocioProphet/agentplane",
+      "artifactKinds": [
+        "ValidationArtifact",
+        "PlacementDecision",
+        "PlacementReceipt",
+        "RunArtifact",
+        "ReplayArtifact",
+        "SessionArtifact"
+      ],
+      "requirePolicyApprovalForRun": true
+    },
+    "policyFabric": {
+      "enabled": true,
+      "repository": "SocioProphet/policy-fabric",
+      "decisionMode": "admit-before-side-effect",
+      "recordDenialsAsEvents": true
+    },
+    "sherlockSearch": {
+      "enabled": true,
+      "repository": "SocioProphet/sherlock-search",
+      "preferred": true,
+      "requirePolicyApprovalForHydration": true
+    },
+    "legacySherlock": {
+      "enabled": false,
+      "repository": "SocioProphet/sherlock",
+      "ambientToolAccess": false,
+      "requireExplicitAuthorization": true,
+      "requirePolicyApproval": true
+    }
+  },
+  "participants": {
+    "hermes": {
+      "enabled": false,
+      "mode": "gateway"
+    },
+    "codex": {
+      "enabled": false,
+      "mode": "repo-branch-pr",
+      "requirePolicyApprovalForMutation": true
+    },
+    "claudeCode": {
+      "enabled": false,
+      "mode": "repo-branch-pr",
+      "requirePolicyApprovalForMutation": true
+    },
+    "openclaw": {
+      "enabled": false,
+      "mode": "local-runtime",
+      "requirePolicyApprovalForSideEffects": true
+    }
+  }
+}

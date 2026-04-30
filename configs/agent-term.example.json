@@ -1,0 +1,180 @@
+{
+  "workspace": "sourceos",
+  "defaultChannel": "!sourceos-ops",
+  "eventStore": {
+    "driver": "sqlite",
+    "path": ".agent-term/events.sqlite3"
+  },
+  "matrix": {
+    "enabled": false,
+    "homeserverUrl": "https://matrix.example.org",
+    "userId": "@agent-term:example.org",
+    "deviceName": "agent-term-operator-console",
+    "rooms": {
+      "sourceosOps": "!sourceos-ops:example.org",
+      "sourceosBuild": "!sourceos-build:example.org",
+      "agentRegistry": "!agent-registry:example.org",
+      "sociosphere": "!sociosphere:example.org",
+      "prophetWorkspace": "!prophet-workspace:example.org",
+      "slashTopics": "!slash-topics:example.org",
+      "memoryMesh": "!memory-mesh:example.org",
+      "newHope": "!new-hope:example.org",
+      "holmes": "!holmes:example.org",
+      "sherlockSearch": "!sherlock-search:example.org",
+      "meshrush": "!meshrush:example.org",
+      "agentplane": "!agentplane:example.org",
+      "policyFabric": "!policyfabric:example.org",
+      "cloudshellFog": "!cloudshell-fog:example.org",
+      "ciFailures": "!ci-failures:example.org"
+    },
+    "requireEncryptedRoomPostureForSensitiveContext": true,
+    "preserveBridgeMetadata": true,
+    "preserveRedactions": true,
+    "preserveMembershipEvents": true
+  },
+  "agentRegistration": {
+    "requireRegisteredParticipants": true,
+    "failClosedWhenRegistryUnavailable": true,
+    "repository": "SocioProphet/agent-registry",
+    "requiredFor": [
+      "hermes",
+      "codex",
+      "claudeCode",
+      "openclaw",
+      "matrixBots",
+      "githubBots",
+      "ciBots",
+      "mcpTools",
+      "localProcessAgents"
+    ]
+  },
+  "planes": {
+    "agentRegistry": {
+      "enabled": true,
+      "repository": "SocioProphet/agent-registry",
+      "role": "agent-specs-identities-sessions-memories-tool-grants-revocation-and-runtime-authority",
+      "requireResolutionBeforeParticipantEnablement": true,
+      "requireToolGrantBeforeAdapterDispatch": true
+    },
+    "sociosphere": {
+      "enabled": true,
+      "repository": "SocioProphet/sociosphere",
+      "role": "meta-workspace-controller",
+      "requirePolicyApprovalForMaterialization": true
+    },
+    "prophetWorkspace": {
+      "enabled": true,
+      "repository": "SocioProphet/prophet-workspace",
+      "role": "professional-workrooms-and-workspace-product-surface",
+      "requirePolicyApprovalForContextHydration": true
+    },
+    "slashTopics": {
+      "enabled": true,
+      "repository": "SocioProphet/slash-topics",
+      "role": "governed-topic-scopes-and-policy-membranes",
+      "requirePolicyApprovalForMembraneApplication": true
+    },
+    "memoryMesh": {
+      "enabled": true,
+      "repository": "SocioProphet/memory-mesh",
+      "role": "governed-recall-writeback-and-context-packs",
+      "requirePolicyApprovalForRecall": true,
+      "requirePolicyApprovalForWriteback": true
+    },
+    "newHope": {
+      "enabled": true,
+      "repository": "SocioProphet/new-hope",
+      "role": "semantic-runtime-for-message-thread-claim-citation-membrane-objects",
+      "requirePolicyApprovalForSemanticMembranes": true
+    },
+    "holmes": {
+      "enabled": true,
+      "repository": "SocioProphet/holmes",
+      "role": "external-language-intelligence-fabric-request-status-artifact-correlation-only",
+      "requirePolicyApprovalForInvestigation": true,
+      "mustNotRedefineHolmesSemantics": true
+    },
+    "sherlockSearch": {
+      "enabled": true,
+      "repository": "SocioProphet/sherlock-search",
+      "preferred": true,
+      "role": "retrieval-search-packets-and-evidence-search",
+      "requirePolicyApprovalForHydration": true
+    },
+    "legacySherlock": {
+      "enabled": false,
+      "repository": "SocioProphet/sherlock",
+      "ambientToolAccess": false,
+      "requireExplicitAuthorization": true,
+      "requirePolicyApproval": true
+    },
+    "meshrush": {
+      "enabled": true,
+      "repository": "SocioProphet/meshrush",
+      "role": "graph-native-agent-runtime-for-graph-views-diffusion-and-crystallization",
+      "requirePolicyApprovalForGraphOperations": true
+    },
+    "cloudshellFog": {
+      "enabled": true,
+      "repository": "SocioProphet/cloudshell-fog",
+      "baseUrl": "http://localhost:8080",
+      "defaultProfile": "default",
+      "defaultTtlSeconds": 3600,
+      "requirePolicyApproval": true
+    },
+    "agentplane": {
+      "enabled": true,
+      "repository": "SocioProphet/agentplane",
+      "artifactKinds": [
+        "ValidationArtifact",
+        "PlacementDecision",
+        "PlacementReceipt",
+        "RunArtifact",
+        "ReplayArtifact",
+        "SessionArtifact"
+      ],
+      "requirePolicyApprovalForRun": true
+    },
+    "policyFabric": {
+      "enabled": true,
+      "repository": "SocioProphet/policy-fabric",
+      "decisionMode": "admit-before-side-effect",
+      "recordDenialsAsEvents": true
+    }
+  },
+  "participants": {
+    "hermes": {
+      "enabled": false,
+      "mode": "gateway",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.hermes"
+    },
+    "codex": {
+      "enabled": false,
+      "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.codex",
+      "requirePolicyApprovalForMutation": true
+    },
+    "claudeCode": {
+      "enabled": false,
+      "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.claude-code",
+      "requirePolicyApprovalForMutation": true
+    },
+    "openclaw": {
+      "enabled": false,
+      "mode": "local-runtime",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.openclaw",
+      "requirePolicyApprovalForSideEffects": true
+    },
+    "localProcessAgents": {
+      "enabled": false,
+      "mode": "developer-only",
+      "requireAgentRegistryResolution": true,
+      "disableForSensitiveContext": true
+    }
+  }
+}

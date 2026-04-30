@@ -1,8 +1,9 @@
 """Adapter contracts for AgentTerm participants.
 
-Adapters translate between AgentTerm events and concrete systems: Matrix rooms, Hermes,
-Codex, Claude Code, OpenCLAW, AgentPlane, Policy Fabric, Sherlock Search, cloudshell-fog,
-GitHub, CI, MCP, and local process agents.
+Adapters translate between AgentTerm events and concrete systems: Matrix rooms,
+Sociosphere, Prophet Workspace, Slash Topics, Memory Mesh, New Hope, Holmes,
+Sherlock Search, MeshRush, cloudshell-fog, AgentPlane, Policy Fabric, Hermes,
+Codex, Claude Code, OpenCLAW, GitHub, CI, MCP, and local process agents.
 
 This file intentionally avoids vendor SDK dependencies. Real network adapters should live behind
 this small contract so the terminal UI, local event log, and policy boundary remain stable.
@@ -90,16 +91,23 @@ class ProcessAdapter:
 
 
 ADAPTER_TARGETS = {
-    "matrix": "Canonical room/event transport adapter; must preserve room IDs, event IDs, redactions, membership, bridge metadata, and E2EE posture.",
+    "matrix": "Canonical room/event transport adapter; preserve room IDs, event IDs, redactions, membership, bridge metadata, and E2EE posture.",
+    "sociosphere": "Meta-workspace controller adapter for manifest, lock, topology, governance registry, and validation-lane events.",
+    "prophet-workspace": "Professional Workrooms and workspace product adapter for workroom binding, policy-aware UX, admin, audit, and search surfaces.",
+    "slash-topics": "Governed topic-scope adapter for signed topic packs, policy membranes, and deterministic receipts.",
+    "memory-mesh": "Governed memory/context adapter for recall, writeback, context packs, LiteLLM hooks, and OpenCLAW memory tools.",
+    "new-hope": "Semantic runtime adapter for messages, threads, claims, citations, entities, lenses, receptors, membranes, and moderation events.",
+    "holmes": "Language-intelligence fabric adapter for casefiles, retrieval, semantic graphs, synthesis, guardrails, and evals.",
+    "sherlock-search": "Preferred Sherlock integration for scoped search packets and context hydration.",
+    "legacy-sherlock": "High-friction policy-gated OSINT wrapper only; never a default ambient tool.",
+    "meshrush": "Graph-operating runtime adapter for graph views, diffusion, crystallization, traces, and graph evidence.",
+    "cloudshell-fog": "Fog-first shell/session substrate; AgentTerm requests sessions but does not bypass OIDC, placement, TTL, or audit.",
+    "agentplane": "Execution authority for bundle validation, placement, runs, replay, and evidence artifacts.",
+    "policy-fabric": "Policy decision and evidence authority for side-effecting commands and sensitive context release.",
     "hermes": "Personal/multi-channel agent gateway participant; may bridge external chat surfaces into Matrix-backed AgentTerm rooms.",
     "codex": "Code-writing participant; must operate through repo branches, diffs, PRs, and approval-gated shell/test commands.",
     "claude-code": "Codebase reasoning and patch participant; must emit plan, diff, command, and evidence events.",
     "openclaw": "Local/open agent runtime participant; must run inside SourceOS capability and policy envelopes.",
-    "cloudshell-fog": "Fog-first shell/session substrate; AgentTerm requests sessions but does not bypass OIDC, placement, TTL, or audit.",
-    "agentplane": "Execution authority for bundle validation, placement, runs, replay, and evidence artifacts.",
-    "policy-fabric": "Policy decision and evidence authority for side-effecting commands and sensitive context release.",
-    "sherlock-search": "Preferred Sherlock integration for scoped search packets and context hydration.",
-    "legacy-sherlock": "High-friction policy-gated OSINT wrapper only; never a default ambient tool.",
     "github": "Issue, PR, review, check, and branch event integration.",
     "ci": "Workflow status/log/retry integration with explicit retry approval gates.",
     "mcp": "Tool-plane adapter for files, docs, search, memory, calendar, and other governed capabilities.",

@@ -2,8 +2,8 @@
 
 These records make SourceOS integration explicit at the CLI/event layer before any
 network adapter is enabled. AgentTerm is the operator console; these planes own the
-actual workspace, semantic, memory, execution, policy, search, shell, and orchestration
-semantics.
+actual agent identity, workspace, semantic, memory, execution, policy, search, shell,
+and orchestration semantics.
 """
 
 from __future__ import annotations
@@ -46,6 +46,24 @@ SOURCEOS_PLANES: tuple[SourceOSPlane, ...] = (
             PlaneCapability("room_event_ingest", "Normalize Matrix room events into the AgentTerm event log.", False, ("message", "command")),
             PlaneCapability("room_event_emit", "Emit approved agent/operator events back into Matrix rooms.", True, ("message", "decision")),
             PlaneCapability("e2ee_posture_check", "Block sensitive context injection when encrypted-room posture is unknown or unsafe.", False, ("policy_check",)),
+        ),
+    ),
+    SourceOSPlane(
+        key="agent-registry",
+        display_name="Agent Registry",
+        repository="SocioProphet/agent-registry",
+        role="Governed registry for SocioProphet agent specs, identities, sessions, memories, tool grants, revocation, and runtime authority.",
+        source="agent-registry",
+        capabilities=(
+            PlaneCapability("resolve_agent_identity", "Resolve an agent participant identity, spec, runtime authority, and registration state.", False, ("agent_identity",)),
+            PlaneCapability("validate_agent_registration", "Validate that a requested AgentTerm participant is registered before enablement.", False, ("validation", "agent_identity")),
+            PlaneCapability("request_tool_grant", "Request a governed tool/capability grant for an agent participant.", True, ("tool_grant", "policy_check")),
+            PlaneCapability("revoke_agent_session", "Revoke or disable an agent session/capability grant.", True, ("revocation", "decision")),
+        ),
+        notes=(
+            "Every non-human AgentTerm participant must be registered in Agent Registry before it is enabled.",
+            "Hermes, Codex, Claude Code, OpenCLAW, GitHub bots, CI bots, MCP tools, Matrix bots, and local process agents should resolve identity and tool grants through Agent Registry.",
+            "AgentTerm local config may reference participants, but Agent Registry remains the runtime authority for agent identity and grants.",
         ),
     ),
     SourceOSPlane(
@@ -135,17 +153,17 @@ SOURCEOS_PLANES: tuple[SourceOSPlane, ...] = (
         key="holmes",
         display_name="Holmes",
         repository="SocioProphet/holmes",
-        role="Governed language intelligence fabric for NLP, semantic search, retrieval, knowledge graphs, guardrails, evals, casefiles, and investigative agentic discovery.",
+        role="External language intelligence fabric for casefiles, retrieval, semantic graphs, synthesis, guardrails, evals, and investigative discovery.",
         source="holmes",
         capabilities=(
-            PlaneCapability("open_casefile", "Bind a workroom/thread to a Holmes investigation or casefile.", True, ("casefile",)),
-            PlaneCapability("investigate", "Run governed language-intelligence workflows over evidence, retrieval, and semantic graphs.", True, ("investigation",)),
-            PlaneCapability("synthesize_findings", "Synthesize findings with claim, citation, provenance, and contradiction metadata.", True, ("synthesis", "evidence")),
-            PlaneCapability("run_evals", "Run language/retrieval/guardrail/evidence evals for a case or agent flow.", True, ("eval",)),
+            PlaneCapability("open_casefile", "Request or correlate a Holmes-owned investigation or casefile.", True, ("casefile",)),
+            PlaneCapability("investigate", "Request a governed Holmes investigation without redefining Holmes behavior.", True, ("investigation",)),
+            PlaneCapability("correlate_holmes_artifact", "Record Holmes-owned artifact, status, eval, guardrail, synthesis, or evidence references.", False, ("evidence", "correlation")),
         ),
         notes=(
-            "Holmes is the language-intelligence fabric above search, evidence, retrieval, casefiles, semantic graphs, tools, models, evals, and agents.",
-            "Holmes should coordinate with Sherlock Search for retrieval and New Hope for semantic message/thread/claim objects.",
+            "AgentTerm must not define Holmes product semantics, schemas, service behavior, model routing, or deployment.",
+            "AgentTerm may request, display, correlate, and audit Holmes-owned work once Holmes exposes stable contracts.",
+            "Holmes integration must respect docs/integration/holmes-boundary.md.",
         ),
     ),
     SourceOSPlane(

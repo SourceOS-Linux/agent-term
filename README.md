@@ -1,6 +1,6 @@
 # AgentTerm
 
-AgentTerm is a terminal-native ChatOps console for coordinating human operators, Matrix rooms, LLM agents, GitHub bots, CI systems, MCP tools, Sociosphere workspace materialization, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh context, New Hope semantic threads, Holmes investigations, Sherlock search packets, MeshRush graph operations, cloudshell-fog sessions, AgentPlane runs, Policy Fabric decisions, and local SourceOS services from one channel/thread workspace.
+AgentTerm is a terminal-native ChatOps console for coordinating human operators, Matrix rooms, registered agents, GitHub bots, CI systems, MCP tools, Agent Registry identities, Sociosphere workspace materialization, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh context, New Hope semantic threads, Holmes investigations, Sherlock search packets, MeshRush graph operations, cloudshell-fog sessions, AgentPlane runs, Policy Fabric decisions, and local SourceOS services from one channel/thread workspace.
 
 The design target is not another single-agent CLI. AgentTerm is the Slack-term class interface for agent operations: rooms, channels, threads, slash commands, approvals, event logs, adapters, and terminal-first operator flow. For SourceOS, Matrix is the canonical network ChatOps substrate. Slack and Discord should be treated as bridge targets, not the source of truth.
 
@@ -9,9 +9,10 @@ The design target is not another single-agent CLI. AgentTerm is the Slack-term c
 - A Python CLI package named `agent-term`.
 - A local SQLite event log for durable operator history.
 - A minimal interactive shell for immediate use.
-- A first-class SourceOS plane registry for Matrix, Sociosphere, Prophet Workspace, Slash Topics, Memory Mesh, New Hope, Holmes, Sherlock Search, legacy Sherlock, MeshRush, cloudshell-fog, AgentPlane, Policy Fabric, GitHub, CI, MCP, Hermes, Codex, Claude Code, and OpenCLAW.
+- A first-class SourceOS plane registry for Matrix, Agent Registry, Sociosphere, Prophet Workspace, Slash Topics, Memory Mesh, New Hope, Holmes, Sherlock Search, legacy Sherlock, MeshRush, cloudshell-fog, AgentPlane, Policy Fabric, GitHub, CI, MCP, Hermes, Codex, Claude Code, and OpenCLAW.
 - Adapter contracts for Matrix, SourceOS planes, and process-backed participants.
 - Governance-preserving command shapes for workroom, topic, memory, semantic-thread, investigation, search-packet, graph-view, and shell-session requests.
+- Agent identity posture: local config may reference agents, but Agent Registry is the authority for specs, identities, sessions, memories, tool grants, revocation, and runtime authority.
 - Configuration examples, tests, CI, and operating-model docs for building AgentTerm into the SourceOS operator console.
 
 ## Core concept
@@ -19,6 +20,7 @@ The design target is not another single-agent CLI. AgentTerm is the Slack-term c
 ```text
 ┌──────────────────────────┬─────────────────────────────────────────────┐
 │ Matrix Rooms / Channels  │ Thread / Conversation                       │
+│ !agent-registry          │ @agent-term: resolve @codex before dispatch │
 │ !prophet-workspace       │ @operator: /workroom pi-demo                │
 │ !slash-topics            │ @operator: /topic professional-intelligence │
 │ !memory-mesh             │ @operator: /memory recall workroom context  │
@@ -38,6 +40,7 @@ AgentTerm treats every meaningful action as an event:
 
 - human chat messages
 - slash commands
+- registered-agent identity, grant, session, and revocation events
 - agent replies
 - Matrix room events, redactions, membership changes, and bridge events
 - Sociosphere workspace manifest, lock, topology, and validation events
@@ -78,6 +81,7 @@ AgentTerm should not collapse the SourceOS stack into one generic search agent.
 
 | Plane | Authority |
 | --- | --- |
+| Agent Registry | Agent specs, identities, sessions, memories, tool grants, revocation, and runtime authority for every non-human participant |
 | Sociosphere | Meta-workspace controller, canonical workspace manifest, lock, topology, governance registry, validation lanes |
 | Prophet Workspace | Workspace product semantics, Professional Workrooms, mail/calendar/drive/docs/chat/meeting surfaces, policy-aware UX |
 | Slash Topics | Governed signed topic scopes, policy membranes, search/knowledge scoping, replayable receipts |
@@ -93,6 +97,8 @@ AgentTerm should not collapse the SourceOS stack into one generic search agent.
 
 New Hope is not “handled by” Sherlock or Holmes. Holmes investigates, Sherlock retrieves, and New Hope normalizes the semantic commons objects they operate over.
 
+Every non-human AgentTerm participant must resolve through Agent Registry before enablement. This includes Hermes, Codex, Claude Code, OpenCLAW, Matrix bots, GitHub bots acting as agents, CI bots acting as agents, MCP-backed tools, local process agents, and future SourceOS agents. Local config is a desired binding, not authority.
+
 ## MVP commands
 
 After cloning locally:
@@ -103,8 +109,10 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 agent-term init
 agent-term planes list
+agent-term planes show agent-registry
 agent-term planes show new-hope
 agent-term post '!sourceos-build' '@operator' 'AgentTerm is online.'
+agent-term record agent-registry agent_identity '!agent-registry' 'Resolve agent.codex before dispatch'
 agent-term record prophet-workspace workroom '!prophet-workspace' 'Bind PI demo workroom' --metadata-json '{"workroom":"pi-demo"}'
 agent-term record slash-topics topic_scope '!slash-topics' 'Select /professional-intelligence topic scope'
 agent-term record memory-mesh memory_recall '!memory-mesh' 'Recall workroom context' --requires-approval
@@ -117,15 +125,16 @@ agent-term tail
 agent-term shell
 ```
 
-The first implementation stores events in SQLite and records governance-preserving events locally. Matrix network I/O, Sociosphere materialization, Prophet Workspace workroom APIs, Slash Topics membranes, Memory Mesh recall/writeback, New Hope semantic normalization, Holmes request/status/artifact correlation, Sherlock Search hydration, MeshRush graph execution, cloudshell-fog session attach, AgentPlane bundle execution, and Policy Fabric admission are intentionally isolated behind adapter boundaries so the terminal, policy, event log, and registry can be hardened independently.
+The first implementation stores events in SQLite and records governance-preserving events locally. Matrix network I/O, Agent Registry resolution/grants/revocation, Sociosphere materialization, Prophet Workspace workroom APIs, Slash Topics membranes, Memory Mesh recall/writeback, New Hope semantic normalization, Holmes request/status/artifact correlation, Sherlock Search hydration, MeshRush graph execution, cloudshell-fog session attach, AgentPlane bundle execution, and Policy Fabric admission are intentionally isolated behind adapter boundaries so the terminal, policy, event log, and registry can be hardened independently.
 
 ## Docs
 
 - [SourceOS control surface architecture](docs/architecture/sourceos-control-surface.md)
+- [Agent Registry integration boundary](docs/integration/agent-registry-boundary.md)
 - [Holmes integration boundary](docs/integration/holmes-boundary.md)
 - [Agent instructions](AGENTS.md)
 - [Example configuration](configs/agent-term.example.json)
 
 ## Repository status
 
-This is the seed implementation. It is intentionally small but runnable. The next step is to land the Matrix-room MVP, then bind Policy Fabric admission, Sociosphere workspace state, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh recall/writeback, New Hope semantic events, Holmes request/status/artifact correlation, Sherlock Search packets, MeshRush graph events, cloudshell-fog session lifecycle, AgentPlane evidence flow, and Hermes/Codex/Claude Code/OpenCLAW participants under explicit operator permissions.
+This is the seed implementation. It is intentionally small but runnable. The next step is to land the Matrix-room MVP, then bind Agent Registry resolution/grants/revocation, Policy Fabric admission, Sociosphere workspace state, Prophet Workspace workrooms, Slash Topics scopes, Memory Mesh recall/writeback, New Hope semantic events, Holmes request/status/artifact correlation, Sherlock Search packets, MeshRush graph events, cloudshell-fog session lifecycle, AgentPlane evidence flow, and Hermes/Codex/Claude Code/OpenCLAW participants under explicit operator permissions.

@@ -13,9 +13,17 @@
     "rooms": {
       "sourceosOps": "!sourceos-ops:example.org",
       "sourceosBuild": "!sourceos-build:example.org",
+      "sociosphere": "!sociosphere:example.org",
+      "prophetWorkspace": "!prophet-workspace:example.org",
+      "slashTopics": "!slash-topics:example.org",
+      "memoryMesh": "!memory-mesh:example.org",
+      "newHope": "!new-hope:example.org",
+      "holmes": "!holmes:example.org",
+      "sherlockSearch": "!sherlock-search:example.org",
+      "meshrush": "!meshrush:example.org",
       "agentplane": "!agentplane:example.org",
       "policyFabric": "!policyfabric:example.org",
-      "sherlockSearch": "!sherlock-search:example.org",
+      "cloudshellFog": "!cloudshell-fog:example.org",
       "ciFailures": "!ci-failures:example.org"
     },
     "requireEncryptedRoomPostureForSensitiveContext": true,
@@ -24,6 +32,63 @@
     "preserveMembershipEvents": true
   },
   "planes": {
+    "sociosphere": {
+      "enabled": true,
+      "repository": "SocioProphet/sociosphere",
+      "role": "meta-workspace-controller",
+      "requirePolicyApprovalForMaterialization": true
+    },
+    "prophetWorkspace": {
+      "enabled": true,
+      "repository": "SocioProphet/prophet-workspace",
+      "role": "professional-workrooms-and-workspace-product-surface",
+      "requirePolicyApprovalForContextHydration": true
+    },
+    "slashTopics": {
+      "enabled": true,
+      "repository": "SocioProphet/slash-topics",
+      "role": "governed-topic-scopes-and-policy-membranes",
+      "requirePolicyApprovalForMembraneApplication": true
+    },
+    "memoryMesh": {
+      "enabled": true,
+      "repository": "SocioProphet/memory-mesh",
+      "role": "governed-recall-writeback-and-context-packs",
+      "requirePolicyApprovalForRecall": true,
+      "requirePolicyApprovalForWriteback": true
+    },
+    "newHope": {
+      "enabled": true,
+      "repository": "SocioProphet/new-hope",
+      "role": "semantic-runtime-for-message-thread-claim-citation-membrane-objects",
+      "requirePolicyApprovalForSemanticMembranes": true
+    },
+    "holmes": {
+      "enabled": true,
+      "repository": "SocioProphet/holmes",
+      "role": "language-intelligence-fabric-for-investigation-casefiles-retrieval-evals-and-guardrails",
+      "requirePolicyApprovalForInvestigation": true
+    },
+    "sherlockSearch": {
+      "enabled": true,
+      "repository": "SocioProphet/sherlock-search",
+      "preferred": true,
+      "role": "retrieval-search-packets-and-evidence-search",
+      "requirePolicyApprovalForHydration": true
+    },
+    "legacySherlock": {
+      "enabled": false,
+      "repository": "SocioProphet/sherlock",
+      "ambientToolAccess": false,
+      "requireExplicitAuthorization": true,
+      "requirePolicyApproval": true
+    },
+    "meshrush": {
+      "enabled": true,
+      "repository": "SocioProphet/meshrush",
+      "role": "graph-native-agent-runtime-for-graph-views-diffusion-and-crystallization",
+      "requirePolicyApprovalForGraphOperations": true
+    },
     "cloudshellFog": {
       "enabled": true,
       "repository": "SocioProphet/cloudshell-fog",
@@ -50,19 +115,6 @@
       "repository": "SocioProphet/policy-fabric",
       "decisionMode": "admit-before-side-effect",
       "recordDenialsAsEvents": true
-    },
-    "sherlockSearch": {
-      "enabled": true,
-      "repository": "SocioProphet/sherlock-search",
-      "preferred": true,
-      "requirePolicyApprovalForHydration": true
-    },
-    "legacySherlock": {
-      "enabled": false,
-      "repository": "SocioProphet/sherlock",
-      "ambientToolAccess": false,
-      "requireExplicitAuthorization": true,
-      "requirePolicyApproval": true
     }
   },
   "participants": {

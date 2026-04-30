@@ -52,11 +52,13 @@ def test_agent_registry_is_participant_authority():
 def test_sherlock_search_is_preferred_surface():
     sherlock = get_plane("sherlock-search")
     legacy = get_plane("legacy-sherlock")
+    legacy_contract = f"{legacy.role} {' '.join(legacy.notes)}".lower()
 
     assert sherlock.repository == "SocioProphet/sherlock-search"
     assert "preferred" in " ".join(sherlock.notes).lower()
     assert legacy.repository == "SocioProphet/sherlock"
-    assert any("policy-gated" in note for note in legacy.notes)
+    assert "policy-gated" in legacy_contract
+    assert "ambient default" in legacy_contract
 
 
 def test_side_effecting_capabilities_require_approval():

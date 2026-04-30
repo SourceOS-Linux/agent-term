@@ -15,6 +15,7 @@ from agent_term.store import DEFAULT_DB_PATH, EventStore
 
 
 DEFAULT_CHANNEL = "!sourceos-ops"
+APPROVAL_NEXT_AUTHORITY = "policy-fabric"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,6 +41,19 @@ def build_parser() -> argparse.ArgumentParser:
     post.add_argument("--source", default="local")
     post.add_argument("--thread-id")
     post.add_argument("--metadata-json", default="{}")
+
+    record = subparsers.add_parser(
+        "record",
+        help="Record a typed SourceOS plane event without invoking a network adapter.",
+    )
+    record.add_argument("plane", help="Registered plane key, e.g. memory-mesh or new-hope.")
+    record.add_argument("kind", help="Event kind, e.g. workroom, topic_scope, memory_recall.")
+    record.add_argument("channel")
+    record.add_argument("body")
+    record.add_argument("--sender", default="@operator")
+    record.add_argument("--thread-id")
+    record.add_argument("--requires-approval", action="store_true")
+    record.add_argument("--metadata-json", default="{}")
 
     tail = subparsers.add_parser("tail", help="Show recent events.")
     tail.add_argument("channel", nargs="?")
@@ -71,6 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     sherlock_packet.add_argument("--sender", default="@operator")
     sherlock_packet.add_argument("--workroom", default="default")
     sherlock_packet.add_argument("--scope", default="workroom")
+    sherlock_packet.add_argument("--topic")
     sherlock_packet.add_argument("--thread-id")
 
     subparsers.add_parser("shell", help="Open the minimal AgentTerm interactive shell.")
@@ -93,6 +108,45 @@ def format_event(event: AgentTermEvent) -> str:
     return (
         f"{event.created_at.isoformat()} [{event.channel}] "
         f"{event.sender} kind={event.kind} source={event.source}{thread}: {event.body}"
+    )
+
+
+def append_and_print(store: EventStore, event: AgentTermEvent) -> int:
+    store.append(event)
+    print(format_event(event))
+    if event.metadata.get("approval_required"):
+        print("status: pending Policy Fabric approval before side effects or sensitive context release")
+    return 0
+
+
+def make_plane_event(
+    *,
+    plane: str,
+    kind: str,
+    channel: str,
+    sender: str,
+    body: str,
+    thread_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    approval_required: bool = False,
+) -> AgentTermEvent:
+    get_plane(plane)
+    merged_metadata: dict[str, Any] = {
+        "plane": plane,
+        "approval_required": approval_required,
+    }
+    if approval_required:
+        merged_metadata["next_authority"] = APPROVAL_NEXT_AUTHORITY
+    if metadata:
+        merged_metadata.update(metadata)
+    return AgentTermEvent(
+        channel=channel,
+        sender=sender,
+        kind=kind,
+        source=plane,
+        body=body,
+        thread_id=thread_id,
+        metadata=merged_metadata,
     )
 
 
@@ -119,9 +173,21 @@ def cmd_post(store: EventStore, args: argparse.Namespace) -> int:
         thread_id=args.thread_id,
         metadata=parse_metadata(args.metadata_json),
     )
-    store.append(event)
-    print(format_event(event))
-    return 0
+    return append_and_print(store, event)
+
+
+def cmd_record(store: EventStore, args: argparse.Namespace) -> int:
+    event = make_plane_event(
+        plane=args.plane,
+        kind=args.kind,
+        channel=args.channel,
+        sender=args.sender,
+        body=args.body,
+        thread_id=args.thread_id,
+        metadata=parse_metadata(args.metadata_json),
+        approval_required=args.requires_approval,
+    )
+    return append_and_print(store, event)
 
 
 def cmd_tail(store: EventStore, args: argparse.Namespace) -> int:
@@ -159,51 +225,42 @@ def cmd_planes(args: argparse.Namespace) -> int:
 
 def cmd_request_shell(store: EventStore, args: argparse.Namespace) -> int:
     metadata = {
-        "plane": "cloudshell-fog",
         "profile": args.profile,
         "ttl_seconds": args.ttl_seconds,
         "placement_hint": args.placement_hint,
-        "approval_required": True,
-        "next_authority": "policy-fabric",
     }
-    event = AgentTermEvent(
+    event = make_plane_event(
+        plane="cloudshell-fog",
+        kind="shell_session",
         channel=args.channel,
         sender=args.sender,
-        kind="shell_session",
-        source="cloudshell-fog",
         body=f"Request cloudshell-fog session profile={args.profile} placement={args.placement_hint}",
         thread_id=args.thread_id,
         metadata=metadata,
+        approval_required=True,
     )
-    store.append(event)
-    print(format_event(event))
-    print("status: pending Policy Fabric approval before shell attach")
-    return 0
+    return append_and_print(store, event)
 
 
 def cmd_sherlock_packet(store: EventStore, args: argparse.Namespace) -> int:
     metadata = {
-        "plane": "sherlock-search",
         "query": args.query,
         "workroom": args.workroom,
         "scope": args.scope,
-        "approval_required": True,
-        "next_authority": "policy-fabric",
+        "topic": args.topic,
         "preferred_repo": "SocioProphet/sherlock-search",
     }
-    event = AgentTermEvent(
+    event = make_plane_event(
+        plane="sherlock-search",
+        kind="search_packet",
         channel=args.channel,
         sender=args.sender,
-        kind="search_packet",
-        source="sherlock-search",
         body=f"Request Sherlock search packet workroom={args.workroom} scope={args.scope}: {args.query}",
         thread_id=args.thread_id,
         metadata=metadata,
+        approval_required=True,
     )
-    store.append(event)
-    print(format_event(event))
-    print("status: pending Policy Fabric approval before context hydration or legacy OSINT tools")
-    return 0
+    return append_and_print(store, event)
 
 
 def cmd_shell(store: EventStore) -> int:
@@ -225,8 +282,14 @@ def cmd_shell(store: EventStore) -> int:
             print("/sender <principal>")
             print("/tail [limit]")
             print("/planes")
-            print("/request-shell [profile]")
+            print("/workroom <id-or-name>")
+            print("/topic <topic-scope>")
+            print("/memory <query>")
+            print("/newhope <thread-or-message-ref>")
+            print("/holmes <investigation request>")
             print("/sherlock <query>")
+            print("/meshrush <graph-view request>")
+            print("/request-shell [profile]")
             print("/quit")
             print("Anything else is posted as a message event.")
             continue
@@ -246,47 +309,111 @@ def cmd_shell(store: EventStore) -> int:
             for plane in iter_planes():
                 print(f"{plane.key}\t{plane.display_name}\t{plane.repository}")
             continue
-        if line.startswith("/request-shell"):
-            parts = shlex.split(line)
-            profile = parts[1] if len(parts) > 1 else "default"
-            event = AgentTermEvent(
+        if line.startswith("/workroom "):
+            ref = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="prophet-workspace",
+                kind="workroom",
                 channel=channel,
                 sender=sender,
-                kind="shell_session",
-                source="cloudshell-fog",
-                body=f"Request cloudshell-fog session profile={profile}",
-                metadata={
-                    "plane": "cloudshell-fog",
-                    "profile": profile,
-                    "approval_required": True,
-                    "next_authority": "policy-fabric",
-                },
+                body=f"Bind AgentTerm thread to Professional Workroom: {ref}",
+                metadata={"workroom": ref},
             )
-            store.append(event)
-            print(format_event(event))
+            append_and_print(store, event)
+            continue
+        if line.startswith("/topic "):
+            scope = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="slash-topics",
+                kind="topic_scope",
+                channel=channel,
+                sender=sender,
+                body=f"Select slash-topic scope: {scope}",
+                metadata={"topic_scope": scope},
+            )
+            append_and_print(store, event)
+            continue
+        if line.startswith("/memory "):
+            query = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="memory-mesh",
+                kind="memory_recall",
+                channel=channel,
+                sender=sender,
+                body=f"Request governed Memory Mesh recall: {query}",
+                metadata={"query": query},
+                approval_required=True,
+            )
+            append_and_print(store, event)
+            continue
+        if line.startswith("/newhope "):
+            ref = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="new-hope",
+                kind="semantic_thread",
+                channel=channel,
+                sender=sender,
+                body=f"Normalize semantic thread/message object: {ref}",
+                metadata={"semantic_ref": ref},
+            )
+            append_and_print(store, event)
+            continue
+        if line.startswith("/holmes "):
+            request = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="holmes",
+                kind="investigation",
+                channel=channel,
+                sender=sender,
+                body=f"Request Holmes investigation: {request}",
+                metadata={"request": request},
+                approval_required=True,
+            )
+            append_and_print(store, event)
             continue
         if line.startswith("/sherlock "):
             query = line.split(maxsplit=1)[1]
-            event = AgentTermEvent(
+            event = make_plane_event(
+                plane="sherlock-search",
+                kind="search_packet",
                 channel=channel,
                 sender=sender,
-                kind="search_packet",
-                source="sherlock-search",
                 body=f"Request Sherlock search packet: {query}",
-                metadata={
-                    "plane": "sherlock-search",
-                    "query": query,
-                    "approval_required": True,
-                    "next_authority": "policy-fabric",
-                },
+                metadata={"query": query},
+                approval_required=True,
             )
-            store.append(event)
-            print(format_event(event))
+            append_and_print(store, event)
+            continue
+        if line.startswith("/meshrush "):
+            request = line.split(maxsplit=1)[1]
+            event = make_plane_event(
+                plane="meshrush",
+                kind="graph_view",
+                channel=channel,
+                sender=sender,
+                body=f"Request MeshRush graph view: {request}",
+                metadata={"request": request},
+                approval_required=True,
+            )
+            append_and_print(store, event)
+            continue
+        if line.startswith("/request-shell"):
+            parts = shlex.split(line)
+            profile = parts[1] if len(parts) > 1 else "default"
+            event = make_plane_event(
+                plane="cloudshell-fog",
+                kind="shell_session",
+                channel=channel,
+                sender=sender,
+                body=f"Request cloudshell-fog session profile={profile}",
+                metadata={"profile": profile},
+                approval_required=True,
+            )
+            append_and_print(store, event)
             continue
 
         event = AgentTermEvent(channel=channel, sender=sender, kind="message", source="local", body=line)
-        store.append(event)
-        print(format_event(event))
+        append_and_print(store, event)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -303,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_init(store)
         if args.command == "post":
             return cmd_post(store, args)
+        if args.command == "record":
+            return cmd_record(store, args)
         if args.command == "tail":
             return cmd_tail(store, args)
         if args.command == "request-shell":

@@ -13,6 +13,7 @@
     "rooms": {
       "sourceosOps": "!sourceos-ops:example.org",
       "sourceosBuild": "!sourceos-build:example.org",
+      "agentRegistry": "!agent-registry:example.org",
       "sociosphere": "!sociosphere:example.org",
       "prophetWorkspace": "!prophet-workspace:example.org",
       "slashTopics": "!slash-topics:example.org",
@@ -31,7 +32,30 @@
     "preserveRedactions": true,
     "preserveMembershipEvents": true
   },
+  "agentRegistration": {
+    "requireRegisteredParticipants": true,
+    "failClosedWhenRegistryUnavailable": true,
+    "repository": "SocioProphet/agent-registry",
+    "requiredFor": [
+      "hermes",
+      "codex",
+      "claudeCode",
+      "openclaw",
+      "matrixBots",
+      "githubBots",
+      "ciBots",
+      "mcpTools",
+      "localProcessAgents"
+    ]
+  },
   "planes": {
+    "agentRegistry": {
+      "enabled": true,
+      "repository": "SocioProphet/agent-registry",
+      "role": "agent-specs-identities-sessions-memories-tool-grants-revocation-and-runtime-authority",
+      "requireResolutionBeforeParticipantEnablement": true,
+      "requireToolGrantBeforeAdapterDispatch": true
+    },
     "sociosphere": {
       "enabled": true,
       "repository": "SocioProphet/sociosphere",
@@ -66,8 +90,9 @@
     "holmes": {
       "enabled": true,
       "repository": "SocioProphet/holmes",
-      "role": "language-intelligence-fabric-for-investigation-casefiles-retrieval-evals-and-guardrails",
-      "requirePolicyApprovalForInvestigation": true
+      "role": "external-language-intelligence-fabric-request-status-artifact-correlation-only",
+      "requirePolicyApprovalForInvestigation": true,
+      "mustNotRedefineHolmesSemantics": true
     },
     "sherlockSearch": {
       "enabled": true,
@@ -120,22 +145,36 @@
   "participants": {
     "hermes": {
       "enabled": false,
-      "mode": "gateway"
+      "mode": "gateway",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.hermes"
     },
     "codex": {
       "enabled": false,
       "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.codex",
       "requirePolicyApprovalForMutation": true
     },
     "claudeCode": {
       "enabled": false,
       "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.claude-code",
       "requirePolicyApprovalForMutation": true
     },
     "openclaw": {
       "enabled": false,
       "mode": "local-runtime",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.openclaw",
       "requirePolicyApprovalForSideEffects": true
+    },
+    "localProcessAgents": {
+      "enabled": false,
+      "mode": "developer-only",
+      "requireAgentRegistryResolution": true,
+      "disableForSensitiveContext": true
     }
   }
 }

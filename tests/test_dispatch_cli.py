@@ -85,7 +85,7 @@ def test_dispatch_cli_registered_agent_with_policy_and_grant_invokes(tmp_path, c
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "dispatch_status=ok" in captured.out
-    assert "adapter=github" in captured.out
+    assert "adapter=registered-participant" in captured.out
 
     store = EventStore(db_path)
     try:

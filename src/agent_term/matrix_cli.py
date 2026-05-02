@@ -12,6 +12,8 @@ from agent_term.config import load_config
 from agent_term.dispatch_cli import build_pipeline
 from agent_term.events import AgentTermEvent
 from agent_term.matrix_service import normalize_sync_payload
+from agent_term.matrix_state import DEFAULT_STATE_PATH, MatrixStateStore, resolve_matrix_room
+from agent_term.matrix_state import rooms_from_sync_payload
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 
 
@@ -22,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", help="Optional AgentTerm JSON config path.")
     parser.add_argument("--db", help="Path to local AgentTerm SQLite event log.")
+    parser.add_argument("--state", default=str(DEFAULT_STATE_PATH), help="Path to Matrix sync state JSON.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     send = subparsers.add_parser("send", help="Send a Matrix message through the AgentTerm dispatch pipeline.")
@@ -41,8 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
     sync = subparsers.add_parser("normalize-sync", help="Normalize a Matrix /sync JSON payload.")
     sync.add_argument("payload", help="Path to a Matrix sync payload JSON file, or '-' for stdin.")
     sync.add_argument("--persist", action="store_true", help="Persist normalized events into EventStore.")
+    sync.add_argument("--save-state", action="store_true", help="Persist next_batch and room IDs into Matrix state.")
     sync.add_argument("--sender", default="@agent-term")
     sync.add_argument("--channel", default="!matrix-sync")
+
+    state = subparsers.add_parser("state", help="Show durable Matrix sync state.")
+    state.add_argument("--json", action="store_true", help="Print state as JSON.")
 
     return parser
 
@@ -50,8 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_send(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     db_path = Path(args.db or config.event_store.path or DEFAULT_DB_PATH)
+    state_store = MatrixStateStore(args.state)
+    state = state_store.load()
+    room_id = resolve_matrix_room(args.room, config, state)
     metadata: dict[str, object] = {
-        "matrix_room_id": args.room,
+        "matrix_room_id": room_id,
+        "matrix_room_alias": args.room if args.room != room_id else None,
         "msgtype": args.msgtype,
         "policy_action": args.policy_action,
     }
@@ -64,7 +75,7 @@ def cmd_send(args: argparse.Namespace) -> int:
         metadata["matrix_e2ee_verified"] = bool(args.matrix_verified)
 
     event = AgentTermEvent(
-        channel=args.room,
+        channel=room_id,
         sender=args.sender,
         kind="matrix_service_send",
         source="matrix-service",
@@ -90,6 +101,7 @@ def cmd_send(args: argparse.Namespace) -> int:
         outcome = build_pipeline(dispatch_args, event, store, config).dispatch(event)
         status = "ok" if outcome.ok else "blocked"
         print(f"matrix_send_status={status}")
+        print(f"matrix_room_id={room_id}")
         if outcome.blocked_reason:
             print(f"blocked_reason={outcome.blocked_reason}")
         print(f"persisted_events={len(outcome.persisted_events)}")
@@ -120,8 +132,27 @@ def cmd_normalize_sync(args: argparse.Namespace) -> int:
             store.close()
         print(f"persisted_events={len(events)}")
 
+    if args.save_state:
+        state_store = MatrixStateStore(args.state)
+        state = state_store.update_rooms(rooms_from_sync_payload(payload))
+        state = state_store.save(state.with_next_batch(batch.next_batch))
+        print(f"matrix_state_next_batch={state.next_batch}")
+        print(f"matrix_state_rooms={len(state.rooms)}")
+
     for event in events:
         print(f"{event.channel}\t{event.sender}\t{event.kind}\t{event.body}")
+    return 0
+
+
+def cmd_state(args: argparse.Namespace) -> int:
+    state = MatrixStateStore(args.state).load()
+    if args.json:
+        print(json.dumps(state.to_dict(), indent=2, sort_keys=True))
+        return 0
+    print(f"matrix_state_next_batch={state.next_batch or ''}")
+    print(f"matrix_state_rooms={len(state.rooms)}")
+    for alias, room_id in sorted(state.rooms.items()):
+        print(f"{alias}\t{room_id}")
     return 0
 
 
@@ -142,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_send(args)
     if args.command == "normalize-sync":
         return cmd_normalize_sync(args)
+    if args.command == "state":
+        return cmd_state(args)
     raise SystemExit(f"unknown command: {args.command}")
 
 

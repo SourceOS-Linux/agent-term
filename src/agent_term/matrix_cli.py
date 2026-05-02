@@ -76,6 +76,7 @@ def cmd_send(args: argparse.Namespace) -> int:
     store = EventStore(db_path)
     try:
         dispatch_args = argparse.Namespace(
+            source="matrix-service",
             agent_id=None,
             register_agent=[],
             grant=[],

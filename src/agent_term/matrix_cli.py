@@ -85,6 +85,7 @@ def cmd_send(args: argparse.Namespace) -> int:
             pending_policy=[],
             policy_action=args.policy_action,
             policy_ref="local://policy-fabric/matrix-cli",
+            sensitive_context=args.sensitive_context,
         )
         outcome = build_pipeline(dispatch_args, event, store, config).dispatch(event)
         status = "ok" if outcome.ok else "blocked"

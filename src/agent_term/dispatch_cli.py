@@ -29,7 +29,14 @@ from agent_term.knowledge import (
 from agent_term.matrix_adapter import MatrixAdapter
 from agent_term.participants import InMemoryParticipantBackend, RegisteredParticipantAdapter
 from agent_term.pipeline import OperatorDispatchPipeline
-from agent_term.policy_fabric import ALLOW, DENY, PENDING, InMemoryPolicyFabricBackend, PolicyDecision
+from agent_term.policy_fabric import (
+    ALLOW,
+    DENY,
+    PENDING,
+    InMemoryPolicyFabricBackend,
+    PolicyDecision,
+    PolicyFabricAdapter,
+)
 from agent_term.policy_fabric import action_for_event
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 from agent_term.workspace import (

@@ -66,6 +66,7 @@ class OperatorDispatchPipeline:
 
     def dispatch(self, event: AgentTermEvent) -> DispatchOutcome:
         persisted: list[AgentTermEvent] = [self.store.append(event)]
+        dispatch_event = event
 
         matrix_event = self._matrix_gate(event)
         if matrix_event is not None:
@@ -84,23 +85,24 @@ class OperatorDispatchPipeline:
             persisted.append(self.store.append(policy_event))
             if _is_blocked(policy_event):
                 return self._outcome(False, event, persisted, _deny_reason(policy_event))
+            dispatch_event = _event_with_policy_decision(event, policy_event)
 
-        adapter = self._select_adapter(event)
+        adapter = self._select_adapter(dispatch_event)
         if adapter is None:
             no_adapter = _result_event(
-                event,
+                dispatch_event,
                 AdapterResult(
                     ok=False,
                     source="pipeline",
                     kind="adapter_result",
-                    body=f"No adapter found for {event.source}.{event.kind}",
+                    body=f"No adapter found for {dispatch_event.source}.{dispatch_event.kind}",
                     metadata={"deny_reason": "no_adapter", "fail_closed": True},
                 ),
             )
             persisted.append(self.store.append(no_adapter))
             return self._outcome(False, event, persisted, "no_adapter")
 
-        result_event = _result_event(event, adapter.handle(event))
+        result_event = _result_event(dispatch_event, adapter.handle(dispatch_event))
         persisted.append(self.store.append(result_event))
         return self._outcome(
             not _is_blocked(result_event),
@@ -224,6 +226,29 @@ class OperatorDispatchPipeline:
 
 def _result_event(request: AgentTermEvent, result: AdapterResult) -> AgentTermEvent:
     return result.to_event(request)
+
+
+def _event_with_policy_decision(event: AgentTermEvent, policy_event: AgentTermEvent) -> AgentTermEvent:
+    policy_decision_id = policy_event.metadata.get("policy_decision_id")
+    if not policy_decision_id:
+        return event
+    metadata = {
+        **event.metadata,
+        "policy_decision_ref": str(policy_decision_id),
+        "policy_decision_id": str(policy_decision_id),
+        "policy_ref": policy_event.metadata.get("policy_ref"),
+    }
+    return AgentTermEvent(
+        channel=event.channel,
+        sender=event.sender,
+        kind=event.kind,
+        source=event.source,
+        body=event.body,
+        thread_id=event.thread_id,
+        metadata=metadata,
+        event_id=event.event_id,
+        created_at=event.created_at,
+    )
 
 
 def _agent_id(event: AgentTermEvent) -> str | None:

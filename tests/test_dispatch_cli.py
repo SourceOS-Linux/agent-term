@@ -1,3 +1,5 @@
+import json
+
 from agent_term.dispatch_cli import main
 from agent_term.store import EventStore
 
@@ -35,6 +37,60 @@ def test_dispatch_cli_success_persists_events_and_snapshot(tmp_path, capsys):
     finally:
         store.close()
     assert [event.source for event in events] == ["memory-mesh", "policy-fabric", "memory-mesh"]
+
+
+def test_dispatch_cli_uses_config_event_store_and_local_runtime_fixtures(tmp_path, capsys):
+    db_path = tmp_path / "configured-events.sqlite3"
+    config_path = tmp_path / "agent-term.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "eventStore": {"driver": "sqlite", "path": str(db_path)},
+                "participants": {
+                    "github": {
+                        "enabled": True,
+                        "agentRegistryId": "agent.github",
+                        "requireAgentRegistryResolution": True,
+                    }
+                },
+                "localRuntime": {
+                    "registeredAgents": ["agent.github"],
+                    "toolGrants": ["agent.github:repo-write:grant.repo-write"],
+                    "allowPolicies": ["github.pr.create"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "github",
+            "github_mutation",
+            "!github",
+            "Create PR",
+            "--config",
+            str(config_path),
+            "--tool",
+            "repo-write",
+            "--policy-action",
+            "github.pr.create",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "dispatch_status=ok" in captured.out
+    assert db_path.exists()
+
+    store = EventStore(db_path)
+    try:
+        events = store.tail(limit=10)
+    finally:
+        store.close()
+    assert events[0].metadata["agent_id"] == "agent.github"
+    assert events[-1].metadata["grant_id"] == "grant.repo-write"
+    assert events[-1].metadata["policy_decision_id"] == "decision.allow.github.pr.create"
 
 
 def test_dispatch_cli_blocks_unknown_agent(tmp_path, capsys):

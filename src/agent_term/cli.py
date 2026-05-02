@@ -16,6 +16,8 @@ from agent_term.store import DEFAULT_DB_PATH, EventStore
 
 DEFAULT_CHANNEL = "!sourceos-ops"
 APPROVAL_NEXT_AUTHORITY = "policy-fabric"
+OFFICE_ARTIFACT_SCHEMA = "https://socioprophet.io/schemas/workspace/office-artifact.schema.json"
+OFFICE_EVIDENCE_KIND = "OfficeArtifactEvidence"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,6 +90,53 @@ def build_parser() -> argparse.ArgumentParser:
     sherlock_packet.add_argument("--topic")
     sherlock_packet.add_argument("--thread-id")
 
+    office = subparsers.add_parser(
+        "office",
+        help="Record governed Prophet Workspace Office Plane requests.",
+    )
+    office_sub = office.add_subparsers(dest="office_command", required=True)
+
+    def add_office_create_common(parser_: argparse.ArgumentParser, artifact_type: str, fmt: str) -> None:
+        parser_.add_argument("channel")
+        parser_.add_argument("--sender", default="@operator")
+        parser_.add_argument("--workroom", default="workroom-local-default")
+        parser_.add_argument("--title", required=True)
+        parser_.add_argument("--format", default=fmt)
+        parser_.add_argument("--thread-id")
+        parser_.set_defaults(artifact_type=artifact_type)
+
+    create_doc = office_sub.add_parser("create-doc", help="Record an Office document generation request.")
+    add_office_create_common(create_doc, "document", "docx")
+
+    create_sheet = office_sub.add_parser("create-sheet", help="Record an Office spreadsheet generation request.")
+    add_office_create_common(create_sheet, "spreadsheet", "xlsx")
+
+    create_deck = office_sub.add_parser("create-deck", help="Record an Office slide deck generation request.")
+    add_office_create_common(create_deck, "slide-deck", "pptx")
+
+    convert = office_sub.add_parser("convert", help="Record an Office conversion request.")
+    convert.add_argument("channel")
+    convert.add_argument("input")
+    convert.add_argument("--to", required=True)
+    convert.add_argument("--sender", default="@operator")
+    convert.add_argument("--workroom", default="workroom-local-default")
+    convert.add_argument("--title", default="Office conversion")
+    convert.add_argument("--thread-id")
+
+    inspect = office_sub.add_parser("inspect", help="Record an Office artifact inspection request.")
+    inspect.add_argument("channel")
+    inspect.add_argument("path")
+    inspect.add_argument("--sender", default="@operator")
+    inspect.add_argument("--workroom", default="workroom-local-default")
+    inspect.add_argument("--thread-id")
+
+    evidence = office_sub.add_parser("evidence", help="Record an Office evidence inspection request.")
+    evidence.add_argument("channel")
+    evidence.add_argument("path")
+    evidence.add_argument("--sender", default="@operator")
+    evidence.add_argument("--workroom", default="workroom-local-default")
+    evidence.add_argument("--thread-id")
+
     subparsers.add_parser("shell", help="Open the minimal AgentTerm interactive shell.")
 
     return parser
@@ -147,6 +196,38 @@ def make_plane_event(
         body=body,
         thread_id=thread_id,
         metadata=merged_metadata,
+    )
+
+
+def make_office_event(
+    *,
+    channel: str,
+    sender: str,
+    workroom: str,
+    operation: str,
+    body: str,
+    thread_id: str | None,
+    metadata: dict[str, Any],
+    approval_required: bool,
+) -> AgentTermEvent:
+    merged = {
+        "workroom": workroom,
+        "office_operation": operation,
+        "office_artifact_schema": OFFICE_ARTIFACT_SCHEMA,
+        "agentplane_evidence_kind": OFFICE_EVIDENCE_KIND,
+        "delegated_executor": "sourceosctl office",
+        "policy_posture": "draft/review-first; send/publish requires approval",
+    }
+    merged.update(metadata)
+    return make_plane_event(
+        plane="prophet-workspace",
+        kind="office_artifact_request",
+        channel=channel,
+        sender=sender,
+        body=body,
+        thread_id=thread_id,
+        metadata=merged,
+        approval_required=approval_required,
     )
 
 
@@ -263,6 +344,97 @@ def cmd_sherlock_packet(store: EventStore, args: argparse.Namespace) -> int:
     return append_and_print(store, event)
 
 
+def cmd_office(store: EventStore, args: argparse.Namespace) -> int:
+    if args.office_command in {"create-doc", "create-sheet", "create-deck"}:
+        sourceosctl_command = [
+            "sourceosctl",
+            "office",
+            "generate",
+            "--dry-run",
+            "--workroom-id",
+            args.workroom,
+            "--artifact-type",
+            args.artifact_type,
+            "--format",
+            args.format,
+            "--title",
+            args.title,
+        ]
+        metadata = {
+            "artifact_type": args.artifact_type,
+            "format": args.format,
+            "title": args.title,
+            "sourceosctl_command": sourceosctl_command,
+        }
+        event = make_office_event(
+            channel=args.channel,
+            sender=args.sender,
+            workroom=args.workroom,
+            operation="generate",
+            body=f"Request Office {args.artifact_type} generation for workroom={args.workroom}: {args.title}",
+            thread_id=args.thread_id,
+            metadata=metadata,
+            approval_required=True,
+        )
+        return append_and_print(store, event)
+
+    if args.office_command == "convert":
+        sourceosctl_command = [
+            "sourceosctl",
+            "office",
+            "convert",
+            args.input,
+            "--to",
+            args.to,
+            "--dry-run",
+            "--workroom-id",
+            args.workroom,
+            "--title",
+            args.title,
+        ]
+        event = make_office_event(
+            channel=args.channel,
+            sender=args.sender,
+            workroom=args.workroom,
+            operation="convert",
+            body=f"Request Office conversion to {args.to} for workroom={args.workroom}: {args.input}",
+            thread_id=args.thread_id,
+            metadata={"input": args.input, "to_format": args.to, "title": args.title, "sourceosctl_command": sourceosctl_command},
+            approval_required=True,
+        )
+        return append_and_print(store, event)
+
+    if args.office_command == "inspect":
+        sourceosctl_command = ["sourceosctl", "office", "inspect", args.path]
+        event = make_office_event(
+            channel=args.channel,
+            sender=args.sender,
+            workroom=args.workroom,
+            operation="inspect",
+            body=f"Request Office artifact inspection for workroom={args.workroom}: {args.path}",
+            thread_id=args.thread_id,
+            metadata={"path": args.path, "sourceosctl_command": sourceosctl_command},
+            approval_required=False,
+        )
+        return append_and_print(store, event)
+
+    if args.office_command == "evidence":
+        sourceosctl_command = ["sourceosctl", "office", "evidence", "inspect", args.path]
+        event = make_office_event(
+            channel=args.channel,
+            sender=args.sender,
+            workroom=args.workroom,
+            operation="evidence_inspect",
+            body=f"Request Office evidence inspection for workroom={args.workroom}: {args.path}",
+            thread_id=args.thread_id,
+            metadata={"path": args.path, "sourceosctl_command": sourceosctl_command},
+            approval_required=False,
+        )
+        return append_and_print(store, event)
+
+    raise SystemExit(f"unknown office command: {args.office_command}")
+
+
 def cmd_shell(store: EventStore) -> int:
     print("AgentTerm shell. Type /help for commands, /quit to exit.")
     channel = DEFAULT_CHANNEL
@@ -283,6 +455,11 @@ def cmd_shell(store: EventStore) -> int:
             print("/tail [limit]")
             print("/planes")
             print("/workroom <id-or-name>")
+            print("/office create-doc <title>")
+            print("/office create-sheet <title>")
+            print("/office create-deck <title>")
+            print("/office convert <path> <format>")
+            print("/office inspect <path>")
             print("/topic <topic-scope>")
             print("/memory <query>")
             print("/newhope <thread-or-message-ref>")
@@ -320,6 +497,56 @@ def cmd_shell(store: EventStore) -> int:
                 metadata={"workroom": ref},
             )
             append_and_print(store, event)
+            continue
+        if line.startswith("/office "):
+            parts = shlex.split(line)
+            if len(parts) >= 3 and parts[1] in {"create-doc", "create-sheet", "create-deck"}:
+                artifact_map = {
+                    "create-doc": ("document", "docx"),
+                    "create-sheet": ("spreadsheet", "xlsx"),
+                    "create-deck": ("slide-deck", "pptx"),
+                }
+                artifact_type, fmt = artifact_map[parts[1]]
+                title = " ".join(parts[2:])
+                event = make_office_event(
+                    channel=channel,
+                    sender=sender,
+                    workroom="workroom-local-default",
+                    operation="generate",
+                    body=f"Request Office {artifact_type} generation: {title}",
+                    thread_id=None,
+                    metadata={"artifact_type": artifact_type, "format": fmt, "title": title},
+                    approval_required=True,
+                )
+                append_and_print(store, event)
+                continue
+            if len(parts) == 4 and parts[1] == "convert":
+                event = make_office_event(
+                    channel=channel,
+                    sender=sender,
+                    workroom="workroom-local-default",
+                    operation="convert",
+                    body=f"Request Office conversion to {parts[3]}: {parts[2]}",
+                    thread_id=None,
+                    metadata={"input": parts[2], "to_format": parts[3]},
+                    approval_required=True,
+                )
+                append_and_print(store, event)
+                continue
+            if len(parts) == 3 and parts[1] == "inspect":
+                event = make_office_event(
+                    channel=channel,
+                    sender=sender,
+                    workroom="workroom-local-default",
+                    operation="inspect",
+                    body=f"Request Office artifact inspection: {parts[2]}",
+                    thread_id=None,
+                    metadata={"path": parts[2]},
+                    approval_required=False,
+                )
+                append_and_print(store, event)
+                continue
+            print("usage: /office create-doc|create-sheet|create-deck <title>; /office convert <path> <format>; /office inspect <path>")
             continue
         if line.startswith("/topic "):
             scope = line.split(maxsplit=1)[1]
@@ -438,6 +665,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_request_shell(store, args)
         if args.command == "sherlock-packet":
             return cmd_sherlock_packet(store, args)
+        if args.command == "office":
+            return cmd_office(store, args)
         if args.command == "shell":
             return cmd_shell(store)
     finally:

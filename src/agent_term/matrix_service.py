@@ -8,10 +8,14 @@ behavior without a live homeserver.
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from agent_term.matrix_adapter import MatrixRoomEvent, normalize_matrix_payload
+from agent_term.adapters import AdapterResult
+from agent_term.config import AgentTermConfig
+from agent_term.events import AgentTermEvent
+from agent_term.matrix_adapter import MatrixRoomEvent, normalize_matrix_payload, posture_from_metadata
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,10 @@ class MatrixSyncBatch:
     events: tuple[MatrixRoomEvent, ...]
     next_batch: str | None = None
     metadata: dict[str, object] = field(default_factory=dict)
+
+
+class MatrixServiceConfigError(RuntimeError):
+    """Raised when Matrix service config is insufficient for a live backend."""
 
 
 class MatrixServiceBackend(Protocol):
@@ -162,6 +170,138 @@ class NioMatrixServiceBackend:
             status="unknown_response",
             error=repr(response),
         )
+
+
+class MatrixServiceAdapter:
+    """Adapter that performs Matrix service send/sync operations through a backend."""
+
+    key = "matrix-service"
+
+    def __init__(self, backend: MatrixServiceBackend) -> None:
+        self.backend = backend
+
+    def supports(self, event: AgentTermEvent) -> bool:
+        return event.source == self.key or event.kind in {"matrix_service_send", "matrix_sync"}
+
+    def handle(self, event: AgentTermEvent) -> AdapterResult:
+        if event.kind == "matrix_service_send":
+            return self._send(event)
+        if event.kind == "matrix_sync":
+            return self._sync(event)
+        return AdapterResult(
+            ok=False,
+            source=self.key,
+            body=f"Unsupported Matrix service event kind: {event.kind}",
+            metadata={"matrix_service_status": "unsupported_kind", "fail_closed": True},
+        )
+
+    def _send(self, event: AgentTermEvent) -> AdapterResult:
+        posture = posture_from_metadata(event.metadata)
+        if event.metadata.get("sensitive_context") and not posture.can_release_sensitive_context:
+            return AdapterResult(
+                ok=False,
+                source=self.key,
+                body="Matrix service send blocked by E2EE posture",
+                kind="matrix_service_send",
+                metadata={
+                    "request_event_id": event.event_id,
+                    "matrix_service_status": "blocked",
+                    "deny_reason": "matrix_posture_blocked",
+                    "fail_closed": True,
+                    **posture.to_metadata(),
+                },
+            )
+
+        room_id = _optional_str(event.metadata.get("matrix_room_id") or event.channel)
+        if not room_id:
+            return AdapterResult(
+                ok=False,
+                source=self.key,
+                body="Matrix service send blocked: missing room ID",
+                kind="matrix_service_send",
+                metadata={"deny_reason": "missing_matrix_room_id", "fail_closed": True},
+            )
+
+        result = self.backend.send_text(
+            MatrixSendRequest(
+                room_id=room_id,
+                body=event.body,
+                msgtype=str(event.metadata.get("msgtype") or "m.text"),
+                thread_root_event_id=_optional_str(
+                    event.metadata.get("matrix_thread_root_event_id") or event.thread_id
+                ),
+                txn_id=_optional_str(event.metadata.get("txn_id")),
+                metadata={"request_event_id": event.event_id},
+            )
+        )
+        return AdapterResult(
+            ok=result.ok,
+            source=self.key,
+            body=f"Matrix service send {result.status}: {room_id}",
+            kind="matrix_service_send",
+            metadata={
+                "request_event_id": event.event_id,
+                "matrix_service_status": result.status,
+                **result.to_metadata(),
+                **posture.to_metadata(),
+            },
+        )
+
+    def _sync(self, event: AgentTermEvent) -> AdapterResult:
+        payload = event.metadata.get("matrix_sync") or event.metadata.get("payload")
+        if not isinstance(payload, dict):
+            return AdapterResult(
+                ok=False,
+                source=self.key,
+                body="Matrix service sync blocked: missing sync payload",
+                kind="matrix_sync",
+                metadata={"deny_reason": "missing_sync_payload", "fail_closed": True},
+            )
+        batch = self.backend.normalize_sync(payload)
+        return AdapterResult(
+            ok=True,
+            source=self.key,
+            body=f"Matrix service normalized {len(batch.events)} sync events",
+            kind="matrix_sync",
+            metadata={
+                "request_event_id": event.event_id,
+                "matrix_service_status": "synced",
+                "matrix_sync_event_count": len(batch.events),
+                "matrix_next_batch": batch.next_batch,
+                "matrix_events": [matrix_event.to_metadata() for matrix_event in batch.events],
+            },
+        )
+
+
+def build_matrix_service_backend(
+    config: AgentTermConfig,
+    *,
+    access_token_env: str = "AGENT_TERM_MATRIX_ACCESS_TOKEN",
+) -> MatrixServiceBackend:
+    """Build a Matrix backend from AgentTerm config.
+
+    Disabled Matrix config returns the offline backend. Enabled Matrix config requires
+    homeserver URL, user ID, and an access token from the environment. We avoid storing
+    access tokens in JSON config.
+    """
+
+    if not config.matrix.enabled:
+        return InMemoryMatrixServiceBackend()
+
+    token = os.environ.get(access_token_env)
+    if not token:
+        raise MatrixServiceConfigError(f"missing Matrix access token env var: {access_token_env}")
+    if not config.matrix.homeserver_url:
+        raise MatrixServiceConfigError("missing matrix.homeserverUrl")
+    if not config.matrix.user_id:
+        raise MatrixServiceConfigError("missing matrix.userId")
+
+    return NioMatrixServiceBackend(
+        homeserver_url=config.matrix.homeserver_url,
+        user_id=config.matrix.user_id,
+        access_token=token,
+        device_name=config.matrix.device_name,
+    )
 
 
 def normalize_sync_payload(payload: dict[str, Any]) -> MatrixSyncBatch:

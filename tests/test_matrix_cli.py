@@ -228,6 +228,38 @@ def test_matrix_cli_normalize_sync_saves_state(tmp_path, capsys):
     assert state["rooms"] == {"!room:example.org": "!room:example.org"}
 
 
+def test_matrix_cli_incremental_sync_uses_stored_next_batch_and_updates_state(tmp_path, capsys):
+    db_path = tmp_path / "events.sqlite3"
+    state_path = tmp_path / "matrix-state.json"
+    state_path.write_text(json.dumps({"next_batch": "batch-1", "rooms": {}}), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--db",
+            str(db_path),
+            "--state",
+            str(state_path),
+            "sync",
+            "--persist",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "matrix_sync_events=0" in captured.out
+    assert "matrix_next_batch=batch-1" in captured.out
+    assert "matrix_state_next_batch=batch-1" in captured.out
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["next_batch"] == "batch-1"
+
+    store = EventStore(db_path)
+    try:
+        events = store.tail(limit=10)
+    finally:
+        store.close()
+    assert events == []
+
+
 def test_matrix_cli_state_prints_state(tmp_path, capsys):
     state_path = tmp_path / "matrix-state.json"
     state_path.write_text(

@@ -1,0 +1,40 @@
+{
+  "next_batch": "local-batch-2",
+  "rooms": {
+    "join": {
+      "!sourceos-ops:example.org": {
+        "timeline": {
+          "events": [
+            {
+              "event_id": "$local-message-1",
+              "sender": "@operator:example.org",
+              "type": "m.room.message",
+              "content": {
+                "body": "AgentTerm local operator flow is online.",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                  "rel_type": "m.thread",
+                  "event_id": "$local-thread-root"
+                }
+              },
+              "unsigned": {
+                "bridge": {
+                  "network": "local-fixture",
+                  "channel": "sourceos-ops"
+                }
+              }
+            },
+            {
+              "event_id": "$local-member-1",
+              "sender": "@agent-term:example.org",
+              "type": "m.room.member",
+              "content": {
+                "membership": "join"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

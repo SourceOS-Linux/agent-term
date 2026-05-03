@@ -24,6 +24,10 @@ def test_loads_example_config_shape(tmp_path):
                     "failClosedWhenRegistryUnavailable": True,
                     "repository": "SocioProphet/agent-registry",
                     "requiredFor": ["codex", "githubBots"],
+                    "fixturePath": "fixtures/agent-registry.json",
+                    "endpointUrl": "https://agent-registry.example.org",
+                    "tokenEnv": "AGENT_TERM_AGENT_REGISTRY_TOKEN",
+                    "timeoutSeconds": 2.5,
                 },
                 "participants": {
                     "codex": {
@@ -55,6 +59,10 @@ def test_loads_example_config_shape(tmp_path):
     assert config.matrix.rooms["sourceosOps"] == "!sourceos-ops:example.org"
     assert config.agent_registration.repository == "SocioProphet/agent-registry"
     assert config.agent_registration.required_for == ("codex", "githubBots")
+    assert config.agent_registration.fixture_path == "fixtures/agent-registry.json"
+    assert config.agent_registration.endpoint_url == "https://agent-registry.example.org"
+    assert config.agent_registration.token_env == "AGENT_TERM_AGENT_REGISTRY_TOKEN"
+    assert config.agent_registration.timeout_seconds == 2.5
     assert config.participant_agent_id("codex") == "agent.codex"
     assert config.participants["codex"].require_policy_approval_for_mutation is True
     assert config.planes["policyFabric"].repository == "SocioProphet/policy-fabric"
@@ -65,6 +73,8 @@ def test_defaults_are_safe_without_config_file():
 
     assert config.workspace == "sourceos"
     assert config.agent_registration.require_registered_participants is True
+    assert config.agent_registration.token_env == "AGENT_TERM_AGENT_REGISTRY_TOKEN"
+    assert config.agent_registration.timeout_seconds == 5.0
     assert config.matrix.require_encrypted_room_posture_for_sensitive_context is True
     assert config.pipeline_config().require_agent_registry_for_participants is True
     assert config.pipeline_config().require_matrix_posture_for_sensitive_context is True

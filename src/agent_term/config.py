@@ -41,6 +41,10 @@ class AgentRegistrationConfig:
     fail_closed_when_registry_unavailable: bool = True
     repository: str = "SocioProphet/agent-registry"
     required_for: tuple[str, ...] = ()
+    fixture_path: str | None = None
+    endpoint_url: str | None = None
+    token_env: str = "AGENT_TERM_AGENT_REGISTRY_TOKEN"
+    timeout_seconds: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -158,6 +162,10 @@ def config_from_dict(raw: dict[str, Any]) -> AgentTermConfig:
             ),
             repository=str(registration_raw.get("repository") or "SocioProphet/agent-registry"),
             required_for=tuple(str(item) for item in _list(registration_raw.get("requiredFor"))),
+            fixture_path=_optional_str(registration_raw.get("fixturePath")),
+            endpoint_url=_optional_str(registration_raw.get("endpointUrl")),
+            token_env=str(registration_raw.get("tokenEnv") or "AGENT_TERM_AGENT_REGISTRY_TOKEN"),
+            timeout_seconds=float(registration_raw.get("timeoutSeconds") or 5.0),
         ),
         planes=planes,
         participants=participants,

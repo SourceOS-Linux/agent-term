@@ -41,6 +41,7 @@ from agent_term.policy_fabric import (
     PolicyFabricAdapter,
 )
 from agent_term.policy_fabric import action_for_event
+from agent_term.policy_fabric_service import build_policy_fabric_backend_from_config
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 from agent_term.workspace import (
     InMemoryProphetWorkspaceBackend,
@@ -150,7 +151,7 @@ def build_policy_backend(
     args: argparse.Namespace,
     event: AgentTermEvent,
     config: AgentTermConfig,
-) -> InMemoryPolicyFabricBackend:
+):
     decisions: list[PolicyDecision] = []
     for action in (*config.local_runtime.allow_policies, *args.allow_policy):
         decisions.append(_decision(action, ALLOW, args.policy_ref))
@@ -164,7 +165,8 @@ def build_policy_backend(
     elif args.sensitive_context and not decisions:
         decisions.append(_decision(action_for_event(event), ALLOW, args.policy_ref))
 
-    return InMemoryPolicyFabricBackend(decisions)
+    fallback = InMemoryPolicyFabricBackend(decisions)
+    return build_policy_fabric_backend_from_config(config, fallback=fallback)
 
 
 def _decision(action: str, status: str, policy_ref: str, reason: str | None = None) -> PolicyDecision:

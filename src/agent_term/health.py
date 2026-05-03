@@ -131,16 +131,6 @@ class HealthChecker:
         )
 
     def check_agent_registry(self, options: HealthCheckOptions) -> HealthCheckResult:
-        fallback = _fallback_agent_registry(options)
-        try:
-            backend = build_agent_registry_backend_from_config(self.config, fallback=fallback)
-        except Exception as exc:  # defensive diagnostic path
-            return HealthCheckResult(
-                name="agent-registry",
-                status=BLOCKED,
-                message=f"Agent Registry backend could not be constructed: {exc}",
-            )
-
         fixture_path = self.config.agent_registration.fixture_path
         endpoint_url = self.config.agent_registration.endpoint_url
         backend_kind = "fixture" if fixture_path else "http" if endpoint_url else "fallback"
@@ -151,6 +141,16 @@ class HealthChecker:
                 status=BLOCKED,
                 message="Agent Registry fixture path does not exist.",
                 metadata={"fixture_path": fixture_path},
+            )
+
+        fallback = _fallback_agent_registry(options)
+        try:
+            backend = build_agent_registry_backend_from_config(self.config, fallback=fallback)
+        except Exception as exc:  # defensive diagnostic path
+            return HealthCheckResult(
+                name="agent-registry",
+                status=BLOCKED,
+                message=f"Agent Registry backend could not be constructed: {exc}",
             )
 
         if options.agent_id:
@@ -205,16 +205,6 @@ class HealthChecker:
         )
 
     def check_policy_fabric(self, options: HealthCheckOptions) -> HealthCheckResult:
-        fallback = _fallback_policy_fabric(options)
-        try:
-            backend = build_policy_fabric_backend_from_config(self.config, fallback=fallback)
-        except Exception as exc:  # defensive diagnostic path
-            return HealthCheckResult(
-                name="policy-fabric",
-                status=BLOCKED,
-                message=f"Policy Fabric backend could not be constructed: {exc}",
-            )
-
         fixture_path = self.config.policy_fabric.fixture_path
         endpoint_url = self.config.policy_fabric.endpoint_url
         backend_kind = "fixture" if fixture_path else "http" if endpoint_url else "fallback"
@@ -225,6 +215,16 @@ class HealthChecker:
                 status=BLOCKED,
                 message="Policy Fabric fixture path does not exist.",
                 metadata={"fixture_path": fixture_path},
+            )
+
+        fallback = _fallback_policy_fabric(options)
+        try:
+            backend = build_policy_fabric_backend_from_config(self.config, fallback=fallback)
+        except Exception as exc:  # defensive diagnostic path
+            return HealthCheckResult(
+                name="policy-fabric",
+                status=BLOCKED,
+                message=f"Policy Fabric backend could not be constructed: {exc}",
             )
 
         if options.policy_action:

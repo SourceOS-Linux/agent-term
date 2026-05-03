@@ -29,6 +29,13 @@ def test_loads_example_config_shape(tmp_path):
                     "tokenEnv": "AGENT_TERM_AGENT_REGISTRY_TOKEN",
                     "timeoutSeconds": 2.5,
                 },
+                "policyFabric": {
+                    "repository": "SocioProphet/policy-fabric",
+                    "fixturePath": "fixtures/policy-fabric.json",
+                    "endpointUrl": "https://policy-fabric.example.org",
+                    "tokenEnv": "AGENT_TERM_POLICY_FABRIC_TOKEN",
+                    "timeoutSeconds": 3.5,
+                },
                 "participants": {
                     "codex": {
                         "enabled": False,
@@ -63,6 +70,11 @@ def test_loads_example_config_shape(tmp_path):
     assert config.agent_registration.endpoint_url == "https://agent-registry.example.org"
     assert config.agent_registration.token_env == "AGENT_TERM_AGENT_REGISTRY_TOKEN"
     assert config.agent_registration.timeout_seconds == 2.5
+    assert config.policy_fabric.repository == "SocioProphet/policy-fabric"
+    assert config.policy_fabric.fixture_path == "fixtures/policy-fabric.json"
+    assert config.policy_fabric.endpoint_url == "https://policy-fabric.example.org"
+    assert config.policy_fabric.token_env == "AGENT_TERM_POLICY_FABRIC_TOKEN"
+    assert config.policy_fabric.timeout_seconds == 3.5
     assert config.participant_agent_id("codex") == "agent.codex"
     assert config.participants["codex"].require_policy_approval_for_mutation is True
     assert config.planes["policyFabric"].repository == "SocioProphet/policy-fabric"
@@ -75,6 +87,9 @@ def test_defaults_are_safe_without_config_file():
     assert config.agent_registration.require_registered_participants is True
     assert config.agent_registration.token_env == "AGENT_TERM_AGENT_REGISTRY_TOKEN"
     assert config.agent_registration.timeout_seconds == 5.0
+    assert config.policy_fabric.repository == "SocioProphet/policy-fabric"
+    assert config.policy_fabric.token_env == "AGENT_TERM_POLICY_FABRIC_TOKEN"
+    assert config.policy_fabric.timeout_seconds == 5.0
     assert config.matrix.require_encrypted_room_posture_for_sensitive_context is True
     assert config.pipeline_config().require_agent_registry_for_participants is True
     assert config.pipeline_config().require_matrix_posture_for_sensitive_context is True

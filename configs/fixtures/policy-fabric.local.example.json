@@ -1,0 +1,42 @@
+{
+  "decisions": [
+    {
+      "decision_id": "decision.allow.matrix-service.matrix_service_send.local",
+      "action": "matrix-service.matrix_service_send",
+      "status": "allow",
+      "policy_ref": "fixture://policy-fabric/matrix-service-send",
+      "obligations": [
+        "record-audit",
+        "preserve-matrix-event-id"
+      ]
+    },
+    {
+      "decision_id": "decision.allow.memory-mesh.memory_recall.local",
+      "action": "memory-mesh.memory_recall",
+      "status": "allow",
+      "policy_ref": "fixture://policy-fabric/memory-recall",
+      "obligations": [
+        "record-context-pack",
+        "preserve-workroom-scope"
+      ]
+    },
+    {
+      "decision_id": "decision.allow.github.pr.create.local",
+      "action": "github.pr.create",
+      "status": "allow",
+      "policy_ref": "fixture://policy-fabric/github-pr-create",
+      "obligations": [
+        "record-pr-url",
+        "preserve-agent-id",
+        "preserve-tool-grant"
+      ]
+    },
+    {
+      "decision_id": "decision.deny.github.repo.delete.local",
+      "action": "github.repo.delete",
+      "status": "deny",
+      "policy_ref": "fixture://policy-fabric/github-repo-delete",
+      "reason": "Repository deletion is not allowed from AgentTerm local operator flow."
+    }
+  ]
+}

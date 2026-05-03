@@ -1,0 +1,87 @@
+{
+  "workspace": "sourceos-local",
+  "defaultChannel": "!sourceos-ops",
+  "eventStore": {
+    "driver": "sqlite",
+    "path": ".agent-term/events.sqlite3"
+  },
+  "matrix": {
+    "enabled": false,
+    "homeserverUrl": "https://matrix.example.org",
+    "userId": "@agent-term:example.org",
+    "deviceName": "agent-term-local",
+    "rooms": {
+      "sourceosOps": "!sourceos-ops:example.org",
+      "agentRegistry": "!agent-registry:example.org",
+      "policyFabric": "!policyfabric:example.org",
+      "memoryMesh": "!memory-mesh:example.org",
+      "github": "!github:example.org"
+    },
+    "requireEncryptedRoomPostureForSensitiveContext": true,
+    "preserveBridgeMetadata": true,
+    "preserveRedactions": true,
+    "preserveMembershipEvents": true
+  },
+  "agentRegistration": {
+    "requireRegisteredParticipants": true,
+    "failClosedWhenRegistryUnavailable": true,
+    "repository": "SocioProphet/agent-registry",
+    "fixturePath": "configs/fixtures/agent-registry.local.example.json",
+    "tokenEnv": "AGENT_TERM_AGENT_REGISTRY_TOKEN",
+    "timeoutSeconds": 5,
+    "requiredFor": [
+      "hermes",
+      "codex",
+      "claudeCode",
+      "openclaw",
+      "matrixBots",
+      "githubBots",
+      "ciBots",
+      "mcpTools",
+      "localProcessAgents"
+    ]
+  },
+  "policyFabric": {
+    "repository": "SocioProphet/policy-fabric",
+    "fixturePath": "configs/fixtures/policy-fabric.local.example.json",
+    "tokenEnv": "AGENT_TERM_POLICY_FABRIC_TOKEN",
+    "timeoutSeconds": 5
+  },
+  "participants": {
+    "github": {
+      "enabled": true,
+      "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.github",
+      "requirePolicyApprovalForMutation": true
+    },
+    "codex": {
+      "enabled": true,
+      "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.codex",
+      "requirePolicyApprovalForMutation": true
+    },
+    "claude-code": {
+      "enabled": true,
+      "mode": "repo-branch-pr",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.claude-code",
+      "requirePolicyApprovalForMutation": true
+    },
+    "mcp": {
+      "enabled": true,
+      "mode": "tool-plane",
+      "requireAgentRegistryResolution": true,
+      "agentRegistryId": "agent.mcp",
+      "requirePolicyApprovalForSideEffects": true
+    }
+  },
+  "localRuntime": {
+    "registeredAgents": [],
+    "toolGrants": [],
+    "allowPolicies": [],
+    "denyPolicies": [],
+    "pendingPolicies": []
+  }
+}

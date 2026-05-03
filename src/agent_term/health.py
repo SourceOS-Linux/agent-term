@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from agent_term.agent_registry import AgentRegistration, InMemoryAgentRegistryBackend, ToolGrant
 from agent_term.agent_registry_service import build_agent_registry_backend_from_config

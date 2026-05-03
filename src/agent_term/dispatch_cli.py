@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agent_term.agent_registry import AgentRegistration, AgentRegistryAdapter
 from agent_term.agent_registry import InMemoryAgentRegistryBackend, ToolGrant
+from agent_term.agent_registry_service import build_agent_registry_backend_from_config
 from agent_term.agentplane import AgentPlaneAdapter, InMemoryAgentPlaneBackend
 from agent_term.cloudshell_fog import CloudShellFogAdapter, InMemoryCloudShellFogBackend
 from agent_term.config import AgentTermConfig, load_config
@@ -115,7 +116,7 @@ def build_event(args: argparse.Namespace, config: AgentTermConfig) -> AgentTermE
     )
 
 
-def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig) -> InMemoryAgentRegistryBackend:
+def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig):
     agent_ids = set(config.local_runtime.registered_agents)
     agent_ids.update(args.register_agent)
     agent_id = args.agent_id or config.participant_agent_id(args.source)
@@ -132,7 +133,8 @@ def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig) ->
         for agent_id in sorted(agent_ids)
     ]
     grants = [_parse_grant(raw) for raw in (*config.local_runtime.tool_grants, *args.grant)]
-    return InMemoryAgentRegistryBackend(agents=agents, grants=grants)
+    fallback = InMemoryAgentRegistryBackend(agents=agents, grants=grants)
+    return build_agent_registry_backend_from_config(config, fallback=fallback)
 
 
 def _parse_grant(raw: str) -> ToolGrant:

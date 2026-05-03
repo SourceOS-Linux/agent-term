@@ -61,6 +61,16 @@ class MatrixSendResult:
 
 
 @dataclass(frozen=True)
+class MatrixSyncRequest:
+    """A Matrix incremental sync request."""
+
+    since: str | None = None
+    timeout_ms: int = 0
+    full_state: bool = False
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class MatrixSyncBatch:
     """Normalized Matrix sync batch."""
 
@@ -79,6 +89,9 @@ class MatrixServiceBackend(Protocol):
     def send_text(self, request: MatrixSendRequest) -> MatrixSendResult:
         """Send a text event into a Matrix room."""
 
+    def sync(self, request: MatrixSyncRequest) -> MatrixSyncBatch:
+        """Run an incremental Matrix sync."""
+
     def normalize_sync(self, payload: dict[str, Any]) -> MatrixSyncBatch:
         """Normalize a Matrix sync payload into AgentTerm MatrixRoomEvents."""
 
@@ -86,8 +99,10 @@ class MatrixServiceBackend(Protocol):
 class InMemoryMatrixServiceBackend:
     """Offline Matrix backend for tests and local development."""
 
-    def __init__(self) -> None:
+    def __init__(self, sync_payloads: list[dict[str, Any]] | None = None) -> None:
         self.sent: list[MatrixSendRequest] = []
+        self.sync_requests: list[MatrixSyncRequest] = []
+        self._sync_payloads = list(sync_payloads or [])
 
     def send_text(self, request: MatrixSendRequest) -> MatrixSendResult:
         self.sent.append(request)
@@ -98,6 +113,22 @@ class InMemoryMatrixServiceBackend:
             event_id=event_id,
             status="sent",
             metadata={"local_backend": True, "txn_id": request.txn_id},
+        )
+
+    def sync(self, request: MatrixSyncRequest) -> MatrixSyncBatch:
+        self.sync_requests.append(request)
+        if not self._sync_payloads:
+            return MatrixSyncBatch(
+                events=(),
+                next_batch=request.since,
+                metadata={"local_backend": True, "empty_sync": True},
+            )
+        payload = self._sync_payloads.pop(0)
+        batch = normalize_sync_payload(payload)
+        return MatrixSyncBatch(
+            events=batch.events,
+            next_batch=batch.next_batch,
+            metadata={**batch.metadata, "local_backend": True, "since": request.since},
         )
 
     def normalize_sync(self, payload: dict[str, Any]) -> MatrixSyncBatch:
@@ -126,6 +157,9 @@ class NioMatrixServiceBackend:
 
     def send_text(self, request: MatrixSendRequest) -> MatrixSendResult:
         return asyncio.run(self._send_text_async(request))
+
+    def sync(self, request: MatrixSyncRequest) -> MatrixSyncBatch:
+        return asyncio.run(self._sync_async(request))
 
     def normalize_sync(self, payload: dict[str, Any]) -> MatrixSyncBatch:
         return normalize_sync_payload(payload)
@@ -169,6 +203,46 @@ class NioMatrixServiceBackend:
             room_id=request.room_id,
             status="unknown_response",
             error=repr(response),
+        )
+
+    async def _sync_async(self, request: MatrixSyncRequest) -> MatrixSyncBatch:
+        try:
+            from nio import AsyncClient, SyncError, SyncResponse
+        except ImportError as exc:
+            raise RuntimeError(
+                "matrix-nio is required for NioMatrixServiceBackend; install agent-term[matrix]"
+            ) from exc
+
+        client = AsyncClient(self.homeserver_url, self.user_id, device_id=self.device_name)
+        client.access_token = self.access_token
+        try:
+            response = await client.sync(
+                timeout=request.timeout_ms,
+                since=request.since,
+                full_state=request.full_state,
+            )
+        finally:
+            await client.close()
+
+        if isinstance(response, SyncResponse):
+            payload = getattr(response, "source", None)
+            if isinstance(payload, dict):
+                return normalize_sync_payload(payload)
+            return MatrixSyncBatch(
+                events=(),
+                next_batch=response.next_batch,
+                metadata={"matrix_sync_response": "nio_without_source_payload"},
+            )
+        if isinstance(response, SyncError):
+            return MatrixSyncBatch(
+                events=(),
+                next_batch=request.since,
+                metadata={"matrix_sync_error": response.message},
+            )
+        return MatrixSyncBatch(
+            events=(),
+            next_batch=request.since,
+            metadata={"matrix_sync_error": repr(response)},
         )
 
 
@@ -248,16 +322,19 @@ class MatrixServiceAdapter:
         )
 
     def _sync(self, event: AgentTermEvent) -> AdapterResult:
-        payload = event.metadata.get("matrix_sync") or event.metadata.get("payload")
-        if not isinstance(payload, dict):
-            return AdapterResult(
-                ok=False,
-                source=self.key,
-                body="Matrix service sync blocked: missing sync payload",
-                kind="matrix_sync",
-                metadata={"deny_reason": "missing_sync_payload", "fail_closed": True},
+        if isinstance(event.metadata.get("matrix_sync"), dict) or isinstance(event.metadata.get("payload"), dict):
+            payload = event.metadata.get("matrix_sync") or event.metadata.get("payload")
+            batch = self.backend.normalize_sync(payload)  # type: ignore[arg-type]
+        else:
+            timeout_ms = int(event.metadata.get("timeout_ms") or 0)
+            batch = self.backend.sync(
+                MatrixSyncRequest(
+                    since=_optional_str(event.metadata.get("since") or event.metadata.get("next_batch")),
+                    timeout_ms=timeout_ms,
+                    full_state=bool(event.metadata.get("full_state")),
+                    metadata={"request_event_id": event.event_id},
+                )
             )
-        batch = self.backend.normalize_sync(payload)
         return AdapterResult(
             ok=True,
             source=self.key,
@@ -269,6 +346,7 @@ class MatrixServiceAdapter:
                 "matrix_sync_event_count": len(batch.events),
                 "matrix_next_batch": batch.next_batch,
                 "matrix_events": [matrix_event.to_metadata() for matrix_event in batch.events],
+                **batch.metadata,
             },
         )
 

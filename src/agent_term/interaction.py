@@ -9,30 +9,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from agent_term.contracts.sourceos.generated.sourceos_interaction_event import (
+    SOURCEOS_INTERACTION_EVENT_REQUIRED,
+    SourceOSInteractionEvent,
+)
 from agent_term.events import AgentTermEvent
 
 JsonObject = dict[str, Any]
 
-REQUIRED_TOP_LEVEL = {
-    "interactionEventId",
-    "type",
-    "specVersion",
-    "eventClass",
-    "occurredAt",
-    "surface",
-    "mode",
-    "session",
-    "actor",
-    "payloadMode",
-    "governanceTrace",
-}
-
+REQUIRED_TOP_LEVEL = set(SOURCEOS_INTERACTION_EVENT_REQUIRED)
 REQUIRED_GOVERNANCE = {"policyAdmitted", "memoryWritten"}
 
 
-def load_interaction_event(path: Path | str) -> JsonObject:
+def load_interaction_event(path: Path | str) -> SourceOSInteractionEvent:
     """Load a SourceOSInteractionEvent JSON object from disk."""
 
     with Path(path).open("r", encoding="utf-8") as handle:
@@ -40,15 +31,15 @@ def load_interaction_event(path: Path | str) -> JsonObject:
 
     if not isinstance(value, dict):
         raise ValueError("SourceOSInteractionEvent payload must be a JSON object")
-    return value
+    return cast(SourceOSInteractionEvent, value)
 
 
-def validate_interaction_event(event: JsonObject) -> list[str]:
+def validate_interaction_event(event: SourceOSInteractionEvent | JsonObject) -> list[str]:
     """Return structural validation errors for AgentTerm's render/ingest boundary.
 
-    This is intentionally a focused local check rather than a full JSON Schema validator.
-    Full schema validation belongs to sourceos-spec CI. AgentTerm needs enough validation
-    to fail closed before rendering or recording malformed events.
+    The canonical schema and generated type live in sourceos-spec. AgentTerm vendors the
+    generated TypedDict for type stability and keeps this focused fail-closed runtime
+    guard at the UI/rendering boundary.
     """
 
     errors: list[str] = []
@@ -95,7 +86,7 @@ def validate_interaction_event(event: JsonObject) -> list[str]:
     return errors
 
 
-def require_valid_interaction_event(event: JsonObject) -> None:
+def require_valid_interaction_event(event: SourceOSInteractionEvent | JsonObject) -> None:
     """Raise a ValueError if the event fails local ingest checks."""
 
     errors = validate_interaction_event(event)
@@ -103,17 +94,18 @@ def require_valid_interaction_event(event: JsonObject) -> None:
         raise ValueError("; ".join(errors))
 
 
-def render_interaction_event(event: JsonObject) -> str:
+def render_interaction_event(event: SourceOSInteractionEvent) -> str:
     """Render a SourceOSInteractionEvent as an operator-readable governance trace."""
 
     require_valid_interaction_event(event)
 
-    surface = _object(event, "surface")
-    session = _object(event, "session")
-    actor = _object(event, "actor")
-    task = _nullable_object(event, "task")
-    steering = _nullable_object(event, "steeringIntent")
-    governance = _object(event, "governanceTrace")
+    event_obj = cast(JsonObject, event)
+    surface = _object(event_obj, "surface")
+    session = _object(event_obj, "session")
+    actor = _object(event_obj, "actor")
+    task = _nullable_object(event_obj, "task")
+    steering = _nullable_object(event_obj, "steeringIntent")
+    governance = _object(event_obj, "governanceTrace")
 
     lines = [
         "SourceOS interaction event",
@@ -178,9 +170,9 @@ def render_interaction_event(event: JsonObject) -> str:
     _append_list(lines, "grants", governance.get("grantRefs"))
     _append_list(lines, "context_packs", governance.get("contextPackRefs"))
     _append_list(lines, "evidence", governance.get("evidenceRefs"))
-    _append_list(lines, "redactions", event.get("redactionRefs"))
+    _append_list(lines, "redactions", event_obj.get("redactionRefs"))
 
-    payload = _nullable_object(event, "payload")
+    payload = _nullable_object(event_obj, "payload")
     if payload and isinstance(payload.get("summary"), str):
         lines.extend(["  payload:", f"    summary: {payload['summary']}"])
     elif event.get("payloadMode"):
@@ -190,7 +182,7 @@ def render_interaction_event(event: JsonObject) -> str:
 
 
 def interaction_to_agent_term_event(
-    event: JsonObject,
+    event: SourceOSInteractionEvent,
     *,
     channel: str = "!sourceos-interaction",
     sender: str = "@agent-term",
@@ -199,13 +191,14 @@ def interaction_to_agent_term_event(
 
     require_valid_interaction_event(event)
 
-    surface = _object(event, "surface")
-    session = _object(event, "session")
-    governance = _object(event, "governanceTrace")
-    task = _nullable_object(event, "task")
-    payload = _nullable_object(event, "payload")
+    event_obj = cast(JsonObject, event)
+    surface = _object(event_obj, "surface")
+    session = _object(event_obj, "session")
+    governance = _object(event_obj, "governanceTrace")
+    task = _nullable_object(event_obj, "task")
+    payload = _nullable_object(event_obj, "payload")
 
-    body = _summary_body(event, payload, task)
+    body = _summary_body(event_obj, payload, task)
     thread_id = session.get("threadRef") if isinstance(session.get("threadRef"), str) else None
     metadata: JsonObject = {
         "sourceos_interaction_event_id": event["interactionEventId"],
@@ -216,8 +209,8 @@ def interaction_to_agent_term_event(
         "task": task,
         "governanceTrace": governance,
         "payloadMode": event["payloadMode"],
-        "sourceEventRefs": event.get("sourceEventRefs", []),
-        "redactionRefs": event.get("redactionRefs", []),
+        "sourceEventRefs": event_obj.get("sourceEventRefs", []),
+        "redactionRefs": event_obj.get("redactionRefs", []),
     }
 
     return AgentTermEvent(

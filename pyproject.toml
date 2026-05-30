@@ -52,6 +52,7 @@ matrix = [
 agent-term = "agent_term.cli:main"
 agent-term-check = "agent_term.health_cli:main"
 agent-term-dispatch = "agent_term.dispatch_cli:main"
+agent-term-interaction = "agent_term.interaction_cli:main"
 agent-term-matrix = "agent_term.matrix_cli:main"
 agent-term-smoke = "agent_term.operator_smoke_cli:main"
 agent-term-snapshot = "agent_term.snapshot_cli:main"

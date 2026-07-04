@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_term.events import AgentTermEvent
+from agent_term.ops_history import context_pack_plan, policy_explain, redactions_pending, replay_plan
 from agent_term.planes import get_plane, iter_planes
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 
@@ -66,6 +67,27 @@ def build_parser() -> argparse.ArgumentParser:
     planes_sub.add_parser("list", help="List registered SourceOS planes.")
     show_plane = planes_sub.add_parser("show", help="Show one registered SourceOS plane.")
     show_plane.add_argument("plane")
+
+    ops_history = subparsers.add_parser(
+        "ops-history",
+        help="Dry-run OpsHistory plans for policy, replay, context packs, and redactions.",
+    )
+    ops_sub = ops_history.add_subparsers(dest="ops_history_command", required=True)
+
+    ops_policy = ops_sub.add_parser("policy", help="Explain an OpsHistory sync-policy profile.")
+    ops_policy.add_argument("--profile", default="active-multi-agent-room")
+    ops_policy.add_argument("--dry-run", action="store_true", default=True)
+
+    ops_replay = ops_sub.add_parser("replay", help="Build an OpsHistory replay dry-run plan.")
+    ops_replay.add_argument("--thread", required=True)
+    ops_replay.add_argument("--dry-run", action="store_true", default=True)
+
+    ops_context = ops_sub.add_parser("context-pack", help="Build an OpsHistory context-pack dry-run plan.")
+    ops_context.add_argument("--workroom", required=True)
+    ops_context.add_argument("--topic")
+    ops_context.add_argument("--dry-run", action="store_true", default=True)
+
+    ops_sub.add_parser("redactions", help="Show pending OpsHistory redaction posture.")
 
     request_shell = subparsers.add_parser(
         "request-shell",
@@ -150,6 +172,11 @@ def parse_metadata(metadata_json: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemExit("metadata must decode to a JSON object")
     return value
+
+
+def print_json(value: dict[str, Any]) -> int:
+    print(json.dumps(value, indent=2, sort_keys=True))
+    return 0
 
 
 def format_event(event: AgentTermEvent) -> str:
@@ -302,6 +329,20 @@ def cmd_planes(args: argparse.Namespace) -> int:
         return 0
 
     raise SystemExit(f"unknown planes command: {args.planes_command}")
+
+
+def cmd_ops_history(args: argparse.Namespace) -> int:
+    if not getattr(args, "dry_run", True):
+        raise SystemExit("OpsHistory commands are dry-run only in this implementation slice")
+    if args.ops_history_command == "policy":
+        return print_json(policy_explain(args.profile))
+    if args.ops_history_command == "replay":
+        return print_json(replay_plan(args.thread))
+    if args.ops_history_command == "context-pack":
+        return print_json(context_pack_plan(args.workroom, topic=args.topic))
+    if args.ops_history_command == "redactions":
+        return print_json(redactions_pending())
+    raise SystemExit(f"unknown ops-history command: {args.ops_history_command}")
 
 
 def cmd_request_shell(store: EventStore, args: argparse.Namespace) -> int:
@@ -650,6 +691,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "planes":
         return cmd_planes(args)
+    if args.command == "ops-history":
+        return cmd_ops_history(args)
 
     store = EventStore(db_path)
     try:

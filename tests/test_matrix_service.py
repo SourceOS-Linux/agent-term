@@ -7,6 +7,7 @@ from agent_term.matrix_service import (
     MatrixSendRequest,
     MatrixServiceAdapter,
     MatrixServiceConfigError,
+    MatrixSyncRequest,
     NioMatrixServiceBackend,
     build_matrix_service_backend,
     normalize_sync_payload,
@@ -38,6 +39,40 @@ def test_in_memory_matrix_backend_sends_text():
     assert result.event_id == "$local-1"
     assert result.metadata["txn_id"] == "txn-1"
     assert backend.sent == [request]
+
+
+def test_in_memory_matrix_backend_incremental_sync_uses_since_token():
+    backend = InMemoryMatrixServiceBackend(
+        sync_payloads=[
+            {
+                "next_batch": "batch-2",
+                "rooms": {
+                    "join": {
+                        "!room:example.org": {
+                            "timeline": {
+                                "events": [
+                                    {
+                                        "event_id": "$event1",
+                                        "sender": "@operator:example.org",
+                                        "type": "m.room.message",
+                                        "content": {"body": "hello"},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+            }
+        ]
+    )
+
+    batch = backend.sync(MatrixSyncRequest(since="batch-1", timeout_ms=1000))
+
+    assert backend.sync_requests[0].since == "batch-1"
+    assert backend.sync_requests[0].timeout_ms == 1000
+    assert batch.next_batch == "batch-2"
+    assert batch.events[0].event_id == "$event1"
+    assert batch.metadata["since"] == "batch-1"
 
 
 def test_normalize_sync_payload_preserves_room_event_metadata():
@@ -158,6 +193,27 @@ def test_matrix_service_adapter_sync_normalizes_payload():
     assert result.metadata["matrix_sync_event_count"] == 1
     assert result.metadata["matrix_next_batch"] == "batch-1"
     assert result.metadata["matrix_events"][0]["matrix_membership"] == "join"
+
+
+def test_matrix_service_adapter_incremental_sync_uses_backend():
+    backend = InMemoryMatrixServiceBackend(sync_payloads=[{"next_batch": "batch-2"}])
+    adapter = MatrixServiceAdapter(backend)
+    event = AgentTermEvent(
+        channel="!matrix-sync",
+        sender="@operator",
+        kind="matrix_sync",
+        source="matrix-service",
+        body="sync",
+        metadata={"since": "batch-1", "timeout_ms": 500, "full_state": True},
+    )
+
+    result = adapter.handle(event)
+
+    assert result.ok is True
+    assert backend.sync_requests[0].since == "batch-1"
+    assert backend.sync_requests[0].timeout_ms == 500
+    assert backend.sync_requests[0].full_state is True
+    assert result.metadata["matrix_next_batch"] == "batch-2"
 
 
 def test_build_matrix_backend_defaults_to_in_memory_when_disabled():

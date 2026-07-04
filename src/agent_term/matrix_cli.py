@@ -11,6 +11,7 @@ from typing import Any
 from agent_term.config import load_config
 from agent_term.dispatch_cli import build_pipeline
 from agent_term.events import AgentTermEvent
+from agent_term.matrix_service import MatrixServiceAdapter, build_matrix_service_backend
 from agent_term.matrix_service import normalize_sync_payload
 from agent_term.matrix_state import DEFAULT_STATE_PATH, MatrixStateStore, resolve_matrix_room
 from agent_term.matrix_state import rooms_from_sync_payload
@@ -47,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--save-state", action="store_true", help="Persist next_batch and room IDs into Matrix state.")
     sync.add_argument("--sender", default="@agent-term")
     sync.add_argument("--channel", default="!matrix-sync")
+
+    live_sync = subparsers.add_parser("sync", help="Run incremental Matrix sync through the configured backend.")
+    live_sync.add_argument("--persist", action="store_true", help="Persist normalized events into EventStore.")
+    live_sync.add_argument("--save-state", action="store_true", default=True, help="Persist next_batch and room IDs into Matrix state.")
+    live_sync.add_argument("--no-save-state", dest="save_state", action="store_false")
+    live_sync.add_argument("--timeout-ms", type=int, default=0)
+    live_sync.add_argument("--full-state", action="store_true")
 
     state = subparsers.add_parser("state", help="Show durable Matrix sync state.")
     state.add_argument("--json", action="store_true", help="Print state as JSON.")
@@ -118,11 +126,56 @@ def cmd_normalize_sync(args: argparse.Namespace) -> int:
     payload = _load_json_payload(args.payload)
     batch = normalize_sync_payload(payload)
 
-    print(f"matrix_sync_events={len(batch.events)}")
-    if batch.next_batch:
-        print(f"matrix_next_batch={batch.next_batch}")
+    print_sync_batch(batch, db_path=db_path, state_path=Path(args.state), persist=args.persist, save_state=args.save_state, payload=payload)
+    return 0
 
-    events = [matrix_event.to_agentterm_event() for matrix_event in batch.events]
+
+def cmd_incremental_sync(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    db_path = Path(args.db or config.event_store.path or DEFAULT_DB_PATH)
+    state_store = MatrixStateStore(args.state)
+    state = state_store.load()
+    event = AgentTermEvent(
+        channel="!matrix-sync",
+        sender="@agent-term",
+        kind="matrix_sync",
+        source="matrix-service",
+        body="Run Matrix incremental sync.",
+        metadata={
+            "since": state.next_batch,
+            "timeout_ms": args.timeout_ms,
+            "full_state": args.full_state,
+        },
+    )
+    result = MatrixServiceAdapter(build_matrix_service_backend(config)).handle(event)
+    if not result.ok:
+        print("matrix_sync_status=blocked")
+        if result.metadata.get("deny_reason"):
+            print(f"blocked_reason={result.metadata['deny_reason']}")
+        return 1
+
+    events_metadata = result.metadata.get("matrix_events")
+    events = []
+    if isinstance(events_metadata, list):
+        for metadata in events_metadata:
+            if not isinstance(metadata, dict):
+                continue
+            events.append(
+                AgentTermEvent(
+                    channel=str(metadata.get("matrix_room_alias") or metadata.get("matrix_room_id") or "!matrix-sync"),
+                    sender=str(metadata.get("matrix_sender_mxid") or "@agent-term"),
+                    kind="matrix_room_event",
+                    source="matrix",
+                    body="",
+                    thread_id=_optional_str(metadata.get("matrix_thread_root_event_id")),
+                    metadata=metadata,
+                )
+            )
+
+    print(f"matrix_sync_events={len(events)}")
+    next_batch = _optional_str(result.metadata.get("matrix_next_batch"))
+    if next_batch:
+        print(f"matrix_next_batch={next_batch}")
     if args.persist:
         store = EventStore(db_path)
         try:
@@ -131,9 +184,29 @@ def cmd_normalize_sync(args: argparse.Namespace) -> int:
         finally:
             store.close()
         print(f"persisted_events={len(events)}")
-
     if args.save_state:
-        state_store = MatrixStateStore(args.state)
+        state = state_store.update_next_batch(next_batch)
+        print(f"matrix_state_next_batch={state.next_batch}")
+    return 0
+
+
+def print_sync_batch(batch, *, db_path: Path, state_path: Path, persist: bool, save_state: bool, payload: dict[str, Any]) -> None:
+    print(f"matrix_sync_events={len(batch.events)}")
+    if batch.next_batch:
+        print(f"matrix_next_batch={batch.next_batch}")
+
+    events = [matrix_event.to_agentterm_event() for matrix_event in batch.events]
+    if persist:
+        store = EventStore(db_path)
+        try:
+            for event in events:
+                store.append(event)
+        finally:
+            store.close()
+        print(f"persisted_events={len(events)}")
+
+    if save_state:
+        state_store = MatrixStateStore(state_path)
         state = state_store.update_rooms(rooms_from_sync_payload(payload))
         state = state_store.save(state.with_next_batch(batch.next_batch))
         print(f"matrix_state_next_batch={state.next_batch}")
@@ -141,7 +214,6 @@ def cmd_normalize_sync(args: argparse.Namespace) -> int:
 
     for event in events:
         print(f"{event.channel}\t{event.sender}\t{event.kind}\t{event.body}")
-    return 0
 
 
 def cmd_state(args: argparse.Namespace) -> int:
@@ -167,12 +239,18 @@ def _load_json_payload(path: str) -> dict[str, Any]:
     return value
 
 
+def _optional_str(value: object) -> str | None:
+    return str(value) if value is not None else None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "send":
         return cmd_send(args)
     if args.command == "normalize-sync":
         return cmd_normalize_sync(args)
+    if args.command == "sync":
+        return cmd_incremental_sync(args)
     if args.command == "state":
         return cmd_state(args)
     raise SystemExit(f"unknown command: {args.command}")

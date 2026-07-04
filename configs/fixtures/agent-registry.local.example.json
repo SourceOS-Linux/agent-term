@@ -1,0 +1,81 @@
+{
+  "agents": [
+    {
+      "agent_id": "agent.github",
+      "registry_ref": "fixture://agent-registry/agent.github",
+      "spec_version": "v1.local",
+      "runtime_authority": "agent-registry",
+      "status": "registered",
+      "session_id": "session-agent-github-local",
+      "tool_grants": [
+        "grant.repo-write"
+      ]
+    },
+    {
+      "agent_id": "agent.codex",
+      "registry_ref": "fixture://agent-registry/agent.codex",
+      "spec_version": "v1.local",
+      "runtime_authority": "agent-registry",
+      "status": "registered",
+      "session_id": "session-agent-codex-local",
+      "tool_grants": [
+        "grant.repo-read",
+        "grant.repo-write"
+      ]
+    },
+    {
+      "agent_id": "agent.claude-code",
+      "registry_ref": "fixture://agent-registry/agent.claude-code",
+      "spec_version": "v1.local",
+      "runtime_authority": "agent-registry",
+      "status": "registered",
+      "session_id": "session-agent-claude-code-local",
+      "tool_grants": [
+        "grant.repo-read"
+      ]
+    },
+    {
+      "agent_id": "agent.mcp",
+      "registry_ref": "fixture://agent-registry/agent.mcp",
+      "spec_version": "v1.local",
+      "runtime_authority": "agent-registry",
+      "status": "registered",
+      "session_id": "session-agent-mcp-local",
+      "tool_grants": [
+        "grant.context-read"
+      ]
+    }
+  ],
+  "tool_grants": [
+    {
+      "grant_id": "grant.repo-read",
+      "agent_id": "agent.codex",
+      "tool": "repo-read",
+      "status": "active"
+    },
+    {
+      "grant_id": "grant.repo-write",
+      "agent_id": "agent.codex",
+      "tool": "repo-write",
+      "status": "active"
+    },
+    {
+      "grant_id": "grant.repo-read",
+      "agent_id": "agent.claude-code",
+      "tool": "repo-read",
+      "status": "active"
+    },
+    {
+      "grant_id": "grant.repo-write",
+      "agent_id": "agent.github",
+      "tool": "repo-write",
+      "status": "active"
+    },
+    {
+      "grant_id": "grant.context-read",
+      "agent_id": "agent.mcp",
+      "tool": "context-read",
+      "status": "active"
+    }
+  ]
+}

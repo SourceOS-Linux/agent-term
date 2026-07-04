@@ -1,0 +1,44 @@
+{
+  "repo": "SourceOS-Linux/agent-term",
+  "domain": "agent",
+  "specVersion": "0.1.0",
+  "ownedSchemas": [
+    "AgentTermSession",
+    "AgentChatCommand",
+    "SlashTopicBinding"
+  ],
+  "syncEngines": [],
+  "sourceChannels": [
+    "agent_term.slash.execute",
+    "agent_term.agent.handoff",
+    "agent_term.memory.propose",
+    "agent_term.tool.invoke",
+    "agent_term.workspace.bind"
+  ],
+  "policyClasses": [
+    "high"
+  ],
+  "auditEvents": [
+    "agent_term.slash.executed",
+    "agent_term.agent.handoff",
+    "agent_term.memory.proposed",
+    "agent_term.policy.denied",
+    "agent_term.workspace.bound"
+  ],
+  "dangerousSurfaces": [
+    "agent_term.slash.execute",
+    "agent_term.agent.handoff",
+    "agent_term.memory.propose",
+    "agent_term.tool.invoke",
+    "agent_term.workspace.bind",
+    "agent_term.shell.bridge"
+  ],
+  "authorityRepos": [
+    "SourceOS-Linux/sourceos-spec",
+    "SourceOS-Linux/agent-machine",
+    "SocioProphet/agent-registry",
+    "SocioProphet/policy-fabric",
+    "SocioProphet/memory-mesh"
+  ],
+  "notes": "Terminal-native agent ChatOps surface. Slash commands and Matrix/topic routing bind to explicit workspace context and must not bypass registry, policy, memory, or runtime authority."
+}

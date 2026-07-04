@@ -41,6 +41,19 @@ class AgentRegistrationConfig:
     fail_closed_when_registry_unavailable: bool = True
     repository: str = "SocioProphet/agent-registry"
     required_for: tuple[str, ...] = ()
+    fixture_path: str | None = None
+    endpoint_url: str | None = None
+    token_env: str = "AGENT_TERM_AGENT_REGISTRY_TOKEN"
+    timeout_seconds: float = 5.0
+
+
+@dataclass(frozen=True)
+class PolicyFabricConfig:
+    repository: str = "SocioProphet/policy-fabric"
+    fixture_path: str | None = None
+    endpoint_url: str | None = None
+    token_env: str = "AGENT_TERM_POLICY_FABRIC_TOKEN"
+    timeout_seconds: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,7 @@ class AgentTermConfig:
     event_store: EventStoreConfig = field(default_factory=EventStoreConfig)
     matrix: MatrixConfig = field(default_factory=MatrixConfig)
     agent_registration: AgentRegistrationConfig = field(default_factory=AgentRegistrationConfig)
+    policy_fabric: PolicyFabricConfig = field(default_factory=PolicyFabricConfig)
     planes: dict[str, PlaneConfig] = field(default_factory=dict)
     participants: dict[str, ParticipantConfig] = field(default_factory=dict)
     local_runtime: LocalRuntimeFixture = field(default_factory=LocalRuntimeFixture)
@@ -120,6 +134,7 @@ def config_from_dict(raw: dict[str, Any]) -> AgentTermConfig:
     event_store_raw = _dict(raw.get("eventStore"))
     matrix_raw = _dict(raw.get("matrix"))
     registration_raw = _dict(raw.get("agentRegistration"))
+    policy_fabric_raw = _dict(raw.get("policyFabric"))
     participants_raw = _dict(raw.get("participants"))
     planes_raw = _dict(raw.get("planes"))
     local_runtime_raw = _dict(raw.get("localRuntime"))
@@ -158,6 +173,17 @@ def config_from_dict(raw: dict[str, Any]) -> AgentTermConfig:
             ),
             repository=str(registration_raw.get("repository") or "SocioProphet/agent-registry"),
             required_for=tuple(str(item) for item in _list(registration_raw.get("requiredFor"))),
+            fixture_path=_optional_str(registration_raw.get("fixturePath")),
+            endpoint_url=_optional_str(registration_raw.get("endpointUrl")),
+            token_env=str(registration_raw.get("tokenEnv") or "AGENT_TERM_AGENT_REGISTRY_TOKEN"),
+            timeout_seconds=float(registration_raw.get("timeoutSeconds") or 5.0),
+        ),
+        policy_fabric=PolicyFabricConfig(
+            repository=str(policy_fabric_raw.get("repository") or "SocioProphet/policy-fabric"),
+            fixture_path=_optional_str(policy_fabric_raw.get("fixturePath")),
+            endpoint_url=_optional_str(policy_fabric_raw.get("endpointUrl")),
+            token_env=str(policy_fabric_raw.get("tokenEnv") or "AGENT_TERM_POLICY_FABRIC_TOKEN"),
+            timeout_seconds=float(policy_fabric_raw.get("timeoutSeconds") or 5.0),
         ),
         planes=planes,
         participants=participants,

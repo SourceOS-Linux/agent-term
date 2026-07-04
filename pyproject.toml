@@ -56,6 +56,7 @@ agent-term-interaction = "agent_term.interaction_cli:main"
 agent-term-matrix = "agent_term.matrix_cli:main"
 agent-term-smoke = "agent_term.operator_smoke_cli:main"
 agent-term-snapshot = "agent_term.snapshot_cli:main"
+agent-term-version = "agent_term.version_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

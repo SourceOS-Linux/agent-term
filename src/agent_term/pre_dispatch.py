@@ -19,7 +19,6 @@ SIDE_EFFECTING_ACTIONS = frozenset(
     {
         "shell_session",
         "shell_attach",
-        "terminal_attach",
         "tool_use",
         "mcp_tool_call",
         "github_mutation",

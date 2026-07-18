@@ -66,12 +66,12 @@ def test_pre_dispatch_rejects_side_effect_without_policy_refs():
     with pytest.raises(ValueError, match="policy decision refs"):
         build_pre_dispatch_decision(
             decision_id="pre-dispatch:no-policy-invalid",
-            requested_action="terminal_attach",
+            requested_action="shell_session",
             participant_ref="human://operator",
             participant_kind="human",
             revocation_state="not-revoked",
             policy_status="allow",
-            dispatch_target="adapter://terminal",
+            dispatch_target="adapter://shell",
         )
 
 

@@ -6,7 +6,7 @@
 
 AgentTerm is the terminal-native / Matrix-first operator console. It is not the authority plane for non-human identity, grants, policy admission, sensitive context release, or side-effecting execution.
 
-This object exists so later participant adapters for Hermes, Codex, Claude Code, OpenCLAW, GitHub, CI, MCP, terminal, Matrix, and AgentPlane cannot dispatch from local config alone.
+This object exists so later participant adapters for Hermes, Codex, Claude Code, OpenCLAW, GitHub, CI, MCP, shell, Matrix, and AgentPlane cannot dispatch from local config alone.
 
 ## Required chain
 
@@ -15,7 +15,7 @@ operator / interaction event = evidence input
 Agent Registry lookup = identity / session / grant / revocation evidence
 Policy Fabric decision = action/context policy evaluation
 AgentTerm pre-dispatch decision = local runtime readiness decision
-AgentPlane / terminal / Matrix adapter = downstream execution surface
+AgentPlane / shell / Matrix adapter = downstream execution surface
 OpsHistory / SourceOSInteractionEvent = record/render path only
 ```
 
@@ -58,6 +58,6 @@ The validator rejects:
 
 ## Non-goals
 
-This tranche does not add live provider calls, terminal execution, Matrix sends, MCP execution, AgentPlane calls, or Agent Registry network access.
+This tranche does not add live provider calls, shell execution, Matrix sends, MCP execution, AgentPlane calls, or Agent Registry network access.
 
 It only defines and validates the decision object that must exist before those surfaces are wired.

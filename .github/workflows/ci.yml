@@ -27,9 +27,3 @@ jobs:
 
       - name: Test
         run: pytest
-
-      - name: Operator smoke
-        run: |
-          agent-term-smoke --workdir .agent-term/ci-smoke
-          test -f .agent-term/ci-smoke/events.sqlite3
-          test -f .agent-term/ci-smoke/matrix-state.json

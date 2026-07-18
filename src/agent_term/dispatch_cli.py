@@ -9,10 +9,8 @@ from pathlib import Path
 
 from agent_term.agent_registry import AgentRegistration, AgentRegistryAdapter
 from agent_term.agent_registry import InMemoryAgentRegistryBackend, ToolGrant
-from agent_term.agent_registry_service import build_agent_registry_backend_from_config
 from agent_term.agentplane import AgentPlaneAdapter, InMemoryAgentPlaneBackend
 from agent_term.cloudshell_fog import CloudShellFogAdapter, InMemoryCloudShellFogBackend
-from agent_term.config import AgentTermConfig, load_config
 from agent_term.events import AgentTermEvent
 from agent_term.knowledge import (
     HolmesAdapter,
@@ -29,7 +27,6 @@ from agent_term.knowledge import (
     SlashTopicsAdapter,
 )
 from agent_term.matrix_adapter import MatrixAdapter
-from agent_term.matrix_service import MatrixServiceAdapter, build_matrix_service_backend
 from agent_term.participants import InMemoryParticipantBackend, RegisteredParticipantAdapter
 from agent_term.pipeline import OperatorDispatchPipeline
 from agent_term.policy_fabric import (
@@ -41,7 +38,6 @@ from agent_term.policy_fabric import (
     PolicyFabricAdapter,
 )
 from agent_term.policy_fabric import action_for_event
-from agent_term.policy_fabric_service import build_policy_fabric_backend_from_config
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 from agent_term.workspace import (
     InMemoryProphetWorkspaceBackend,
@@ -60,8 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("kind", help="Event kind, e.g. memory_recall, agent_message, context_pack.")
     parser.add_argument("channel", help="Logical channel or Matrix room alias/ID.")
     parser.add_argument("body", help="Event body.")
-    parser.add_argument("--config", help="Optional AgentTerm JSON config path.")
-    parser.add_argument("--db", help="Path to local AgentTerm SQLite event log.")
+    parser.add_argument("--db", default=str(DEFAULT_DB_PATH), help="Path to local AgentTerm SQLite event log.")
     parser.add_argument("--sender", default="@operator")
     parser.add_argument("--thread-id")
     parser.add_argument("--metadata-json", default="{}")
@@ -91,11 +86,10 @@ def parse_metadata(metadata_json: str) -> dict[str, object]:
     return value
 
 
-def build_event(args: argparse.Namespace, config: AgentTermConfig) -> AgentTermEvent:
+def build_event(args: argparse.Namespace) -> AgentTermEvent:
     metadata = parse_metadata(args.metadata_json)
-    agent_id = args.agent_id or config.participant_agent_id(args.source)
-    if agent_id:
-        metadata["agent_id"] = agent_id
+    if args.agent_id:
+        metadata["agent_id"] = args.agent_id
     if args.tool:
         metadata["tool"] = args.tool
     if args.policy_action:
@@ -117,12 +111,10 @@ def build_event(args: argparse.Namespace, config: AgentTermConfig) -> AgentTermE
     )
 
 
-def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig):
-    agent_ids = set(config.local_runtime.registered_agents)
-    agent_ids.update(args.register_agent)
-    agent_id = args.agent_id or config.participant_agent_id(args.source)
-    if agent_id:
-        agent_ids.add(agent_id)
+def build_registry_backend(args: argparse.Namespace) -> InMemoryAgentRegistryBackend:
+    agent_ids = set(args.register_agent)
+    if args.agent_id:
+        agent_ids.add(args.agent_id)
 
     agents = [
         AgentRegistration(
@@ -133,9 +125,8 @@ def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig):
         )
         for agent_id in sorted(agent_ids)
     ]
-    grants = [_parse_grant(raw) for raw in (*config.local_runtime.tool_grants, *args.grant)]
-    fallback = InMemoryAgentRegistryBackend(agents=agents, grants=grants)
-    return build_agent_registry_backend_from_config(config, fallback=fallback)
+    grants = [_parse_grant(raw) for raw in args.grant]
+    return InMemoryAgentRegistryBackend(agents=agents, grants=grants)
 
 
 def _parse_grant(raw: str) -> ToolGrant:
@@ -147,17 +138,13 @@ def _parse_grant(raw: str) -> ToolGrant:
     return ToolGrant(grant_id=grant_id, agent_id=agent_id, tool=tool)
 
 
-def build_policy_backend(
-    args: argparse.Namespace,
-    event: AgentTermEvent,
-    config: AgentTermConfig,
-):
+def build_policy_backend(args: argparse.Namespace, event: AgentTermEvent) -> InMemoryPolicyFabricBackend:
     decisions: list[PolicyDecision] = []
-    for action in (*config.local_runtime.allow_policies, *args.allow_policy):
+    for action in args.allow_policy:
         decisions.append(_decision(action, ALLOW, args.policy_ref))
-    for action in (*config.local_runtime.deny_policies, *args.deny_policy):
+    for action in args.deny_policy:
         decisions.append(_decision(action, DENY, args.policy_ref, reason="denied by dispatch CLI"))
-    for action in (*config.local_runtime.pending_policies, *args.pending_policy):
+    for action in args.pending_policy:
         decisions.append(_decision(action, PENDING, args.policy_ref))
 
     if args.policy_action and args.policy_action not in {decision.action for decision in decisions}:
@@ -165,8 +152,7 @@ def build_policy_backend(
     elif args.sensitive_context and not decisions:
         decisions.append(_decision(action_for_event(event), ALLOW, args.policy_ref))
 
-    fallback = InMemoryPolicyFabricBackend(decisions)
-    return build_policy_fabric_backend_from_config(config, fallback=fallback)
+    return InMemoryPolicyFabricBackend(decisions)
 
 
 def _decision(action: str, status: str, policy_ref: str, reason: str | None = None) -> PolicyDecision:
@@ -179,19 +165,13 @@ def _decision(action: str, status: str, policy_ref: str, reason: str | None = No
     )
 
 
-def build_pipeline(
-    args: argparse.Namespace,
-    event: AgentTermEvent,
-    store: EventStore,
-    config: AgentTermConfig,
-) -> OperatorDispatchPipeline:
-    registry_backend = build_registry_backend(args, config)
-    policy_backend = build_policy_backend(args, event, config)
+def build_pipeline(args: argparse.Namespace, event: AgentTermEvent, store: EventStore) -> OperatorDispatchPipeline:
+    registry_backend = build_registry_backend(args)
+    policy_backend = build_policy_backend(args, event)
     participant_backend = InMemoryParticipantBackend()
 
     adapters = (
         MatrixAdapter(),
-        MatrixServiceAdapter(build_matrix_service_backend(config)),
         CloudShellFogAdapter(InMemoryCloudShellFogBackend()),
         AgentPlaneAdapter(InMemoryAgentPlaneBackend()),
         SociosphereAdapter(InMemorySociosphereBackend()),
@@ -211,18 +191,15 @@ def build_pipeline(
         agent_registry_adapter=AgentRegistryAdapter(registry_backend),
         policy_fabric_adapter=PolicyFabricAdapter(policy_backend),
         adapters=adapters,
-        config=config.pipeline_config(),
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    config = load_config(args.config)
-    event = build_event(args, config)
-    db_path = Path(args.db or config.event_store.path or DEFAULT_DB_PATH)
-    store = EventStore(db_path)
+    event = build_event(args)
+    store = EventStore(Path(args.db))
     try:
-        outcome = build_pipeline(args, event, store, config).dispatch(event)
+        outcome = build_pipeline(args, event, store).dispatch(event)
         status = "ok" if outcome.ok else "blocked"
         print(f"dispatch_status={status}")
         if outcome.adapter_key:

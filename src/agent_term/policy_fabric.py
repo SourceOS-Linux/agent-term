@@ -40,7 +40,6 @@ SIDE_EFFECTING_KINDS = frozenset(
         "ci_retry",
         "tool_grant",
         "revocation",
-        "matrix_service_send",
     }
 )
 

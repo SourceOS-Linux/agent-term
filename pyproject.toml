@@ -51,6 +51,7 @@ matrix = [
 [project.scripts]
 agent-term = "agent_term.cli:main"
 agent-term-dispatch = "agent_term.dispatch_cli:main"
+agent-term-matrix = "agent_term.matrix_cli:main"
 agent-term-snapshot = "agent_term.snapshot_cli:main"
 
 [tool.setuptools.packages.find]

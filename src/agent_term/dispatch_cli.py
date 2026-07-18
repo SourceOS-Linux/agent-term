@@ -27,6 +27,7 @@ from agent_term.knowledge import (
     SlashTopicsAdapter,
 )
 from agent_term.matrix_adapter import MatrixAdapter
+from agent_term.matrix_service import MatrixServiceAdapter, build_matrix_service_backend
 from agent_term.participants import InMemoryParticipantBackend, RegisteredParticipantAdapter
 from agent_term.pipeline import OperatorDispatchPipeline
 from agent_term.policy_fabric import (
@@ -172,6 +173,7 @@ def build_pipeline(args: argparse.Namespace, event: AgentTermEvent, store: Event
 
     adapters = (
         MatrixAdapter(),
+        MatrixServiceAdapter(build_matrix_service_backend(config)),
         CloudShellFogAdapter(InMemoryCloudShellFogBackend()),
         AgentPlaneAdapter(InMemoryAgentPlaneBackend()),
         SociosphereAdapter(InMemorySociosphereBackend()),

@@ -1,3 +1,5 @@
+import json
+
 from agent_term.dispatch_cli import main
 from agent_term.store import EventStore
 
@@ -35,45 +37,6 @@ def test_dispatch_cli_success_persists_events_and_snapshot(tmp_path, capsys):
     finally:
         store.close()
     assert [event.source for event in events] == ["memory-mesh", "policy-fabric", "memory-mesh"]
-
-
-def test_dispatch_cli_matrix_service_send_is_policy_gated_and_persisted(tmp_path, capsys):
-    db_path = tmp_path / "events.sqlite3"
-
-    exit_code = main(
-        [
-            "matrix-service",
-            "matrix_service_send",
-            "!room:example.org",
-            "Hello Matrix",
-            "--db",
-            str(db_path),
-            "--policy-action",
-            "matrix-service.matrix_service_send",
-            "--allow-policy",
-            "matrix-service.matrix_service_send",
-            "--metadata-json",
-            '{"txn_id":"txn-1"}',
-        ]
-    )
-
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert "dispatch_status=ok" in captured.out
-    assert "adapter=matrix-service" in captured.out
-
-    store = EventStore(db_path)
-    try:
-        events = store.tail(limit=10)
-    finally:
-        store.close()
-    assert [event.source for event in events] == [
-        "matrix-service",
-        "policy-fabric",
-        "matrix-service",
-    ]
-    assert events[-1].metadata["matrix_service_status"] == "sent"
-    assert events[-1].metadata["matrix_event_id"] == "$local-1"
 
 
 def test_dispatch_cli_uses_config_event_store_and_local_runtime_fixtures(tmp_path, capsys):

@@ -48,15 +48,6 @@ class AgentRegistrationConfig:
 
 
 @dataclass(frozen=True)
-class PolicyFabricConfig:
-    repository: str = "SocioProphet/policy-fabric"
-    fixture_path: str | None = None
-    endpoint_url: str | None = None
-    token_env: str = "AGENT_TERM_POLICY_FABRIC_TOKEN"
-    timeout_seconds: float = 5.0
-
-
-@dataclass(frozen=True)
 class ParticipantConfig:
     key: str
     enabled: bool = False
@@ -177,13 +168,6 @@ def config_from_dict(raw: dict[str, Any]) -> AgentTermConfig:
             endpoint_url=_optional_str(registration_raw.get("endpointUrl")),
             token_env=str(registration_raw.get("tokenEnv") or "AGENT_TERM_AGENT_REGISTRY_TOKEN"),
             timeout_seconds=float(registration_raw.get("timeoutSeconds") or 5.0),
-        ),
-        policy_fabric=PolicyFabricConfig(
-            repository=str(policy_fabric_raw.get("repository") or "SocioProphet/policy-fabric"),
-            fixture_path=_optional_str(policy_fabric_raw.get("fixturePath")),
-            endpoint_url=_optional_str(policy_fabric_raw.get("endpointUrl")),
-            token_env=str(policy_fabric_raw.get("tokenEnv") or "AGENT_TERM_POLICY_FABRIC_TOKEN"),
-            timeout_seconds=float(policy_fabric_raw.get("timeoutSeconds") or 5.0),
         ),
         planes=planes,
         participants=participants,

@@ -10,7 +10,28 @@ from pathlib import Path
 from typing import Any
 
 from agent_term.events import AgentTermEvent
+from agent_term.graph_binding import (
+    format_agent_list,
+    format_graph_snapshot,
+    format_leases,
+    get_agent_list,
+    get_capability_leases,
+    get_graph_snapshot,
+)
+from agent_term.ops_history import context_pack_plan, policy_explain
 from agent_term.planes import get_plane, iter_planes
+from agent_term.reasoning_run import (
+    format_run_index,
+    format_run_trace,
+    get_run_index,
+    get_run_trace,
+)
+from agent_term.state_integrity import (
+    format_conflict_queue,
+    format_status,
+    get_conflict_queue,
+    get_status,
+)
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 
 
@@ -89,6 +110,64 @@ def build_parser() -> argparse.ArgumentParser:
     sherlock_packet.add_argument("--thread-id")
 
     subparsers.add_parser("shell", help="Open the minimal AgentTerm interactive shell.")
+
+    # --- state-integrity (#36) ---
+    si = subparsers.add_parser(
+        "state-integrity",
+        help="SourceOS State Integrity ChatOps surface (sourceos-syncd).",
+    )
+    si_sub = si.add_subparsers(dest="si_command", required=True)
+    si_status = si_sub.add_parser("status", help="Show State Integrity daemon status.")
+    si_status.add_argument("--json", dest="json_mode", action="store_true")
+    si_conflicts = si_sub.add_parser("conflicts", help="List pending state conflicts.")
+    si_conflicts.add_argument("--json", dest="json_mode", action="store_true")
+    si_conflicts.add_argument("--limit", type=int, default=20)
+
+    # --- graph (#37) ---
+    graph = subparsers.add_parser(
+        "graph",
+        help="SourceOS agentic graph: Agent Registry, Policy Fabric, capability leases.",
+    )
+    graph_sub = graph.add_subparsers(dest="graph_command", required=True)
+    graph_status = graph_sub.add_parser("status", help="Show graph foundation snapshot.")
+    graph_status.add_argument("--json", dest="json_mode", action="store_true")
+    graph_agents = graph_sub.add_parser("agents", help="List registered agents.")
+    graph_agents.add_argument("--json", dest="json_mode", action="store_true")
+    graph_leases = graph_sub.add_parser("leases", help="Show active capability leases.")
+    graph_leases.add_argument("--agent", dest="agent_ref", default=None)
+    graph_leases.add_argument("--json", dest="json_mode", action="store_true")
+
+    # --- reasoning-run (#38) ---
+    rr = subparsers.add_parser(
+        "reasoning-run",
+        help="Superconscious ReasoningRun trace console.",
+    )
+    rr_sub = rr.add_subparsers(dest="rr_command", required=True)
+    rr_list = rr_sub.add_parser("list", help="List recent ReasoningRun traces.")
+    rr_list.add_argument("--limit", type=int, default=10)
+    rr_list.add_argument("--agent", dest="agent_ref", default=None)
+    rr_list.add_argument("--json", dest="json_mode", action="store_true")
+    rr_show = rr_sub.add_parser("show", help="Show a single ReasoningRun trace.")
+    rr_show.add_argument("run_ref")
+    rr_show.add_argument("--json", dest="json_mode", action="store_true")
+
+    # --- ops-history (#33) ---
+    oh = subparsers.add_parser(
+        "ops-history",
+        help="OpsHistory control plane: sync policy, context packs, replay.",
+    )
+    oh_sub = oh.add_subparsers(dest="oh_command", required=True)
+    oh_policy = oh_sub.add_parser("policy", help="Explain a sync policy profile.")
+    oh_policy.add_argument(
+        "--profile",
+        default="active-multi-agent-room",
+        help="Policy profile name (default: active-multi-agent-room).",
+    )
+    oh_policy.add_argument("--json", dest="json_mode", action="store_true")
+    oh_cp = oh_sub.add_parser("context-pack", help="Plan a context-pack export.")
+    oh_cp.add_argument("--workroom", default="pi-demo")
+    oh_cp.add_argument("--topic", default=None)
+    oh_cp.add_argument("--json", dest="json_mode", action="store_true")
 
     return parser
 
@@ -416,6 +495,73 @@ def cmd_shell(store: EventStore) -> int:
         append_and_print(store, event)
 
 
+def cmd_state_integrity(args: argparse.Namespace) -> int:
+    """State Integrity ChatOps surface (issue #36)."""
+    sub = args.si_command
+    json_mode = getattr(args, "json_mode", False)
+    if sub == "status":
+        status = get_status()
+        print(format_status(status, json_mode=json_mode))
+        return 0
+    if sub == "conflicts":
+        queue = get_conflict_queue(limit=args.limit)
+        print(format_conflict_queue(queue, json_mode=json_mode))
+        return 0
+    raise SystemExit(f"unknown state-integrity command: {sub}")
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    """Agentic graph ChatOps surface (issue #37)."""
+    sub = args.graph_command
+    json_mode = getattr(args, "json_mode", False)
+    if sub == "status":
+        snapshot = get_graph_snapshot()
+        print(format_graph_snapshot(snapshot, json_mode=json_mode))
+        return 0
+    if sub == "agents":
+        agents = get_agent_list()
+        print(format_agent_list(agents, json_mode=json_mode))
+        return 0
+    if sub == "leases":
+        leases = get_capability_leases(agent_ref=getattr(args, "agent_ref", None))
+        print(format_leases(leases, json_mode=json_mode))
+        return 0
+    raise SystemExit(f"unknown graph command: {sub}")
+
+
+def cmd_reasoning_run(args: argparse.Namespace) -> int:
+    """ReasoningRun trace console (issue #38)."""
+    sub = args.rr_command
+    json_mode = getattr(args, "json_mode", False)
+    if sub == "list":
+        index = get_run_index(limit=args.limit, agent_ref=getattr(args, "agent_ref", None))
+        print(format_run_index(index, json_mode=json_mode))
+        return 0
+    if sub == "show":
+        trace = get_run_trace(args.run_ref)
+        if trace is None:
+            print(f"No ReasoningRun found: {args.run_ref}")
+            return 1
+        print(format_run_trace(trace, json_mode=json_mode))
+        return 0
+    raise SystemExit(f"unknown reasoning-run command: {sub}")
+
+
+def cmd_ops_history(args: argparse.Namespace) -> int:
+    """OpsHistory control plane (issue #33)."""
+    sub = args.oh_command
+    json_mode = getattr(args, "json_mode", False)
+    if sub == "policy":
+        result = policy_explain(args.profile)
+        print(json.dumps(result, indent=2))
+        return 0
+    if sub == "context-pack":
+        result = context_pack_plan(args.workroom, topic=args.topic)
+        print(json.dumps(result, indent=2))
+        return 0
+    raise SystemExit(f"unknown ops-history command: {sub}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -440,6 +586,14 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_sherlock_packet(store, args)
         if args.command == "shell":
             return cmd_shell(store)
+        if args.command == "state-integrity":
+            return cmd_state_integrity(args)
+        if args.command == "graph":
+            return cmd_graph(args)
+        if args.command == "reasoning-run":
+            return cmd_reasoning_run(args)
+        if args.command == "ops-history":
+            return cmd_ops_history(args)
     finally:
         store.close()
 

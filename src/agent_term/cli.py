@@ -10,6 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from agent_term.events import AgentTermEvent
+from agent_term.agent_machine_adapter import (
+    cmd_attach,
+    cmd_doctor,
+    cmd_evidence,
+    cmd_fingerprint,
+    cmd_init,
+    cmd_run,
+)
+from agent_term.tui import _TEXTUAL_AVAILABLE, run_tui
 from agent_term.graph_binding import (
     format_agent_list,
     format_graph_snapshot,
@@ -138,6 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
     office_convert.add_argument("--thread-id")
 
     subparsers.add_parser("shell", help="Open the minimal AgentTerm interactive shell.")
+
+    tui = subparsers.add_parser(
+        "tui",
+        help="Open the Textual TUI operator console (requires agent-term[textual]).",
+    )
+    tui.add_argument("--db", dest="tui_db", default=None, help="Override DB path for TUI.")
 
     # --- state-integrity (#36) ---
     si = subparsers.add_parser(
@@ -440,6 +455,12 @@ def cmd_shell(store: EventStore) -> int:
             print("/sherlock <query>")
             print("/meshrush <graph-view request>")
             print("/request-shell [profile]")
+            print("/agent-machine doctor")
+            print("/agent-machine init <profile> <repo>")
+            print("/agent-machine attach <workspace>")
+            print("/agent-machine run <tool> <workspace>")
+            print("/agent-machine fingerprint <workspace>")
+            print("/agent-machine evidence <workspace>")
             print("/quit")
             print("Anything else is posted as a message event.")
             continue
@@ -562,6 +583,25 @@ def cmd_shell(store: EventStore) -> int:
             append_and_print(store, event)
             continue
 
+        if line.startswith("/agent-machine "):
+            parts = shlex.split(line)
+            subcmd = parts[1] if len(parts) > 1 else "doctor"
+            if subcmd == "doctor":
+                append_and_print(store, cmd_doctor(channel, sender))
+            elif subcmd == "init" and len(parts) >= 4:
+                append_and_print(store, cmd_init(channel, sender, parts[2], parts[3]))
+            elif subcmd == "attach" and len(parts) >= 3:
+                append_and_print(store, cmd_attach(channel, sender, parts[2]))
+            elif subcmd == "run" and len(parts) >= 4:
+                append_and_print(store, cmd_run(channel, sender, parts[2], parts[3]))
+            elif subcmd == "fingerprint" and len(parts) >= 3:
+                append_and_print(store, cmd_fingerprint(channel, sender, parts[2]))
+            elif subcmd == "evidence" and len(parts) >= 3:
+                append_and_print(store, cmd_evidence(channel, sender, parts[2]))
+            else:
+                print(f"Usage: /agent-machine doctor|init <profile> <repo>|attach <ws>|run <tool> <ws>|fingerprint <ws>|evidence <ws>")
+            continue
+
         event = AgentTermEvent(channel=channel, sender=sender, kind="message", source="local", body=line)
         append_and_print(store, event)
 
@@ -658,6 +698,17 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_office(store, args)
         if args.command == "shell":
             return cmd_shell(store)
+        if args.command == "tui":
+            tui_db = Path(args.tui_db) if getattr(args, "tui_db", None) else db_path
+            if not _TEXTUAL_AVAILABLE:
+                print(
+                    "ERROR: Textual is not installed. Install with:\n"
+                    "  pip install agent-term[textual]",
+                    file=sys.stderr,
+                )
+                return 1
+            run_tui(db_path=tui_db)
+            return 0
         if args.command == "state-integrity":
             return cmd_state_integrity(args)
         if args.command == "graph":

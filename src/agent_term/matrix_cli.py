@@ -12,6 +12,12 @@ from agent_term.config import load_config
 from agent_term.dispatch_cli import build_pipeline
 from agent_term.events import AgentTermEvent
 from agent_term.matrix_service import normalize_sync_payload
+from agent_term.matrix_state import (
+    MatrixStateStore,
+    MatrixSyncState,
+    resolve_matrix_room,
+    rooms_from_sync_payload,
+)
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 
 
@@ -22,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", help="Optional AgentTerm JSON config path.")
     parser.add_argument("--db", help="Path to local AgentTerm SQLite event log.")
+    parser.add_argument("--state", help="Path to a Matrix sync state JSON file (room map + next_batch).")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     send = subparsers.add_parser("send", help="Send a Matrix message through the AgentTerm dispatch pipeline.")
@@ -41,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
     sync = subparsers.add_parser("normalize-sync", help="Normalize a Matrix /sync JSON payload.")
     sync.add_argument("payload", help="Path to a Matrix sync payload JSON file, or '-' for stdin.")
     sync.add_argument("--persist", action="store_true", help="Persist normalized events into EventStore.")
+    sync.add_argument(
+        "--save-state",
+        action="store_true",
+        help="Record the room map + next_batch cursor into the --state file.",
+    )
     sync.add_argument("--sender", default="@agent-term")
     sync.add_argument("--channel", default="!matrix-sync")
 
@@ -50,8 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_send(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     db_path = Path(args.db or config.event_store.path or DEFAULT_DB_PATH)
+    state = (
+        MatrixStateStore(Path(args.state)).load()
+        if getattr(args, "state", None)
+        else MatrixSyncState.from_dict({})
+    )
+    room_id = resolve_matrix_room(args.room, config, state)
     metadata: dict[str, object] = {
-        "matrix_room_id": args.room,
+        "matrix_room_id": room_id,
         "msgtype": args.msgtype,
         "policy_action": args.policy_action,
     }
@@ -64,7 +82,7 @@ def cmd_send(args: argparse.Namespace) -> int:
         metadata["matrix_e2ee_verified"] = bool(args.matrix_verified)
 
     event = AgentTermEvent(
-        channel=args.room,
+        channel=room_id,
         sender=args.sender,
         kind="matrix_service_send",
         source="matrix-service",
@@ -119,6 +137,19 @@ def cmd_normalize_sync(args: argparse.Namespace) -> int:
         finally:
             store.close()
         print(f"persisted_events={len(events)}")
+
+    if args.save_state:
+        if not args.state:
+            raise SystemExit("--save-state requires --state <path>")
+        store_state = MatrixStateStore(Path(args.state))
+        state = store_state.load()
+        rooms = rooms_from_sync_payload(payload)
+        if rooms:
+            state = state.with_rooms(rooms)
+        if batch.next_batch:
+            state = state.with_next_batch(batch.next_batch)
+        store_state.save(state)
+        print(f"matrix_state_saved={args.state}")
 
     for event in events:
         print(f"{event.channel}\t{event.sender}\t{event.kind}\t{event.body}")

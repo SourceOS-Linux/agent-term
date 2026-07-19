@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from agent_term.adapters import AdapterResult
 from agent_term.events import AgentTermEvent
 
 

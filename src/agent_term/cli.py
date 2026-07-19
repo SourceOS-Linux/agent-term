@@ -11,12 +11,12 @@ from typing import Any
 
 from agent_term.events import AgentTermEvent
 from agent_term.agent_machine_adapter import (
-    cmd_attach,
-    cmd_doctor,
-    cmd_evidence,
-    cmd_fingerprint,
-    cmd_init,
-    cmd_run,
+    cmd_attach as am_cmd_attach,
+    cmd_doctor as am_cmd_doctor,
+    cmd_evidence as am_cmd_evidence,
+    cmd_fingerprint as am_cmd_fingerprint,
+    cmd_init as am_cmd_init,
+    cmd_run as am_cmd_run,
 )
 from agent_term.tui import _TEXTUAL_AVAILABLE, run_tui
 from agent_term.graph_binding import (
@@ -587,19 +587,19 @@ def cmd_shell(store: EventStore) -> int:
             parts = shlex.split(line)
             subcmd = parts[1] if len(parts) > 1 else "doctor"
             if subcmd == "doctor":
-                append_and_print(store, cmd_doctor(channel, sender))
+                append_and_print(store, am_cmd_doctor(channel, sender))
             elif subcmd == "init" and len(parts) >= 4:
-                append_and_print(store, cmd_init(channel, sender, parts[2], parts[3]))
+                append_and_print(store, am_cmd_init(channel, sender, parts[2], parts[3]))
             elif subcmd == "attach" and len(parts) >= 3:
-                append_and_print(store, cmd_attach(channel, sender, parts[2]))
+                append_and_print(store, am_cmd_attach(channel, sender, parts[2]))
             elif subcmd == "run" and len(parts) >= 4:
-                append_and_print(store, cmd_run(channel, sender, parts[2], parts[3]))
+                append_and_print(store, am_cmd_run(channel, sender, parts[2], parts[3]))
             elif subcmd == "fingerprint" and len(parts) >= 3:
-                append_and_print(store, cmd_fingerprint(channel, sender, parts[2]))
+                append_and_print(store, am_cmd_fingerprint(channel, sender, parts[2]))
             elif subcmd == "evidence" and len(parts) >= 3:
-                append_and_print(store, cmd_evidence(channel, sender, parts[2]))
+                append_and_print(store, am_cmd_evidence(channel, sender, parts[2]))
             else:
-                print(f"Usage: /agent-machine doctor|init <profile> <repo>|attach <ws>|run <tool> <ws>|fingerprint <ws>|evidence <ws>")
+                print("Usage: /agent-machine doctor|init <profile> <repo>|attach <ws>|run <tool> <ws>|fingerprint <ws>|evidence <ws>")
             continue
 
         event = AgentTermEvent(channel=channel, sender=sender, kind="message", source="local", body=line)

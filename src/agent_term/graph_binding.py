@@ -85,12 +85,12 @@ class GraphSnapshot:
             ],
             "active_leases": [
                 {
-                    "lease_ref": l.lease_ref,
-                    "agent_ref": l.agent_ref,
-                    "capability": l.capability,
-                    "decision": l.decision,
+                    "lease_ref": lease.lease_ref,
+                    "agent_ref": lease.agent_ref,
+                    "capability": lease.capability,
+                    "decision": lease.decision,
                 }
-                for l in self.active_leases
+                for lease in self.active_leases
             ],
             "recent_decisions_count": len(self.recent_decisions),
             "memory_mesh_connected": self.memory_mesh_connected,
@@ -151,12 +151,15 @@ def format_agent_list(agents: list[AgentRegistryEntry], json_mode: bool = False)
 def format_leases(leases: list[CapabilityLease], json_mode: bool = False) -> str:
     if json_mode:
         return json.dumps(
-            [{"lease_ref": l.lease_ref, "capability": l.capability, "decision": l.decision} for l in leases],
+            [
+                {"lease_ref": lease.lease_ref, "capability": lease.capability, "decision": lease.decision}
+                for lease in leases
+            ],
             indent=2,
         )
     if not leases:
         return f"No active capability leases. (note: {STUB_NOTE})"
     lines = ["Active capability leases:"]
-    for l in leases:
-        lines.append(f"  {l.capability}  {l.decision}  {l.lease_ref}")
+    for lease in leases:
+        lines.append(f"  {lease.capability}  {lease.decision}  {lease.lease_ref}")
     return "\n".join(lines)

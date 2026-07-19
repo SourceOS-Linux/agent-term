@@ -621,7 +621,6 @@ def cmd_reasoning_run(args: argparse.Namespace) -> int:
 def cmd_ops_history(args: argparse.Namespace) -> int:
     """OpsHistory control plane (issue #33)."""
     sub = args.oh_command
-    json_mode = getattr(args, "json_mode", False)
     if sub == "policy":
         result = policy_explain(args.profile)
         print(json.dumps(result, indent=2))

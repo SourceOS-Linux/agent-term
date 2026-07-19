@@ -7,7 +7,7 @@ snapshot source event in the local event log.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Iterable
 
 from agent_term.adapters import AdapterResult, AgentTermAdapter
@@ -85,7 +85,23 @@ class OperatorDispatchPipeline:
             if _is_blocked(policy_event):
                 return self._outcome(False, event, persisted, _deny_reason(policy_event))
 
-        adapter = self._select_adapter(event)
+        # Propagate the admitted policy decision onto the event so downstream
+        # domain adapters (which require a resolved decision) can proceed.
+        dispatch_event = event
+        if policy_event is not None:
+            decision_ref = policy_event.metadata.get(
+                "policy_decision_id"
+            ) or policy_event.metadata.get("policy_decision_ref")
+            already_present = event.metadata.get("policy_decision_ref") or event.metadata.get(
+                "policy_decision_id"
+            )
+            if decision_ref and not already_present:
+                dispatch_event = replace(
+                    event,
+                    metadata={**event.metadata, "policy_decision_ref": decision_ref},
+                )
+
+        adapter = self._select_adapter(dispatch_event)
         if adapter is None:
             no_adapter = _result_event(
                 event,
@@ -100,7 +116,7 @@ class OperatorDispatchPipeline:
             persisted.append(self.store.append(no_adapter))
             return self._outcome(False, event, persisted, "no_adapter")
 
-        result_event = _result_event(event, adapter.handle(event))
+        result_event = _result_event(dispatch_event, adapter.handle(dispatch_event))
         persisted.append(self.store.append(result_event))
         return self._outcome(
             not _is_blocked(result_event),

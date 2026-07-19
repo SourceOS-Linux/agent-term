@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 from agent_term.agent_registry import AgentRegistration, AgentRegistryAdapter
-from agent_term.agent_registry import InMemoryAgentRegistryBackend, ToolGrant
+from agent_term.agent_registry import AgentRegistryBackend, InMemoryAgentRegistryBackend, ToolGrant
+from agent_term.agent_registry_service import build_agent_registry_backend_from_config
 from agent_term.agentplane import AgentPlaneAdapter, InMemoryAgentPlaneBackend
 from agent_term.cloudshell_fog import CloudShellFogAdapter, InMemoryCloudShellFogBackend
 from agent_term.config import AgentTermConfig, load_config
@@ -38,8 +39,10 @@ from agent_term.policy_fabric import (
     InMemoryPolicyFabricBackend,
     PolicyDecision,
     PolicyFabricAdapter,
+    PolicyFabricBackend,
 )
 from agent_term.policy_fabric import action_for_event
+from agent_term.policy_fabric_service import build_policy_fabric_backend_from_config
 from agent_term.store import DEFAULT_DB_PATH, EventStore
 from agent_term.workspace import (
     InMemoryProphetWorkspaceBackend,
@@ -115,7 +118,7 @@ def build_event(args: argparse.Namespace, config: AgentTermConfig) -> AgentTermE
     )
 
 
-def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig) -> InMemoryAgentRegistryBackend:
+def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig) -> AgentRegistryBackend:
     agent_ids = set(config.local_runtime.registered_agents)
     agent_ids.update(args.register_agent)
     agent_id = args.agent_id or config.participant_agent_id(args.source)
@@ -132,7 +135,10 @@ def build_registry_backend(args: argparse.Namespace, config: AgentTermConfig) ->
         for agent_id in sorted(agent_ids)
     ]
     grants = [_parse_grant(raw) for raw in (*config.local_runtime.tool_grants, *args.grant)]
-    return InMemoryAgentRegistryBackend(agents=agents, grants=grants)
+    # A config-declared Agent Registry (file-backed or HTTP) is authoritative;
+    # the CLI-flag / local-runtime agents+grants serve as the fallback.
+    in_memory = InMemoryAgentRegistryBackend(agents=agents, grants=grants)
+    return build_agent_registry_backend_from_config(config, fallback=in_memory)
 
 
 def _parse_grant(raw: str) -> ToolGrant:
@@ -148,7 +154,7 @@ def build_policy_backend(
     args: argparse.Namespace,
     event: AgentTermEvent,
     config: AgentTermConfig,
-) -> InMemoryPolicyFabricBackend:
+) -> PolicyFabricBackend:
     decisions: list[PolicyDecision] = []
     for action in (*config.local_runtime.allow_policies, *args.allow_policy):
         decisions.append(_decision(action, ALLOW, args.policy_ref))
@@ -162,7 +168,10 @@ def build_policy_backend(
     elif args.sensitive_context and not decisions:
         decisions.append(_decision(action_for_event(event), ALLOW, args.policy_ref))
 
-    return InMemoryPolicyFabricBackend(decisions)
+    # A config-declared Policy Fabric service (file-backed or HTTP) is authoritative;
+    # the CLI-flag / local-runtime decisions serve as the fallback when none is configured.
+    in_memory = InMemoryPolicyFabricBackend(decisions)
+    return build_policy_fabric_backend_from_config(config, fallback=in_memory)
 
 
 def _decision(action: str, status: str, policy_ref: str, reason: str | None = None) -> PolicyDecision:

@@ -109,6 +109,34 @@ def build_parser() -> argparse.ArgumentParser:
     sherlock_packet.add_argument("--topic")
     sherlock_packet.add_argument("--thread-id")
 
+    office = subparsers.add_parser(
+        "office",
+        help="Record governed Office (prophet-workspace) artifact request events.",
+    )
+    office_sub = office.add_subparsers(dest="office_command", required=True)
+
+    office_deck = office_sub.add_parser("create-deck", help="Request Office slide-deck generation.")
+    office_deck.add_argument("channel")
+    office_deck.add_argument("--workroom", default="default")
+    office_deck.add_argument("--title", required=True)
+    office_deck.add_argument("--sender", default="@operator")
+    office_deck.add_argument("--thread-id")
+
+    office_inspect = office_sub.add_parser("inspect", help="Inspect an Office artifact (read-only).")
+    office_inspect.add_argument("channel")
+    office_inspect.add_argument("path")
+    office_inspect.add_argument("--workroom", default="default")
+    office_inspect.add_argument("--sender", default="@operator")
+    office_inspect.add_argument("--thread-id")
+
+    office_convert = office_sub.add_parser("convert", help="Request Office artifact conversion.")
+    office_convert.add_argument("channel")
+    office_convert.add_argument("path")
+    office_convert.add_argument("--to", dest="to_format", required=True)
+    office_convert.add_argument("--workroom", default="default")
+    office_convert.add_argument("--sender", default="@operator")
+    office_convert.add_argument("--thread-id")
+
     subparsers.add_parser("shell", help="Open the minimal AgentTerm interactive shell.")
 
     # --- state-integrity (#36) ---
@@ -340,6 +368,49 @@ def cmd_sherlock_packet(store: EventStore, args: argparse.Namespace) -> int:
         approval_required=True,
     )
     return append_and_print(store, event)
+
+
+def cmd_office(store: EventStore, args: argparse.Namespace) -> int:
+    if args.office_command == "create-deck":
+        event = make_plane_event(
+            plane="prophet-workspace",
+            kind="office_artifact_request",
+            channel=args.channel,
+            sender=args.sender,
+            body=f"Request Office slide-deck generation: {args.title}",
+            thread_id=args.thread_id,
+            metadata={"workroom": args.workroom, "artifact": "slide-deck", "title": args.title},
+            approval_required=True,
+        )
+        return append_and_print(store, event)
+
+    if args.office_command == "inspect":
+        event = make_plane_event(
+            plane="prophet-workspace",
+            kind="office_artifact_inspection",
+            channel=args.channel,
+            sender=args.sender,
+            body=f"Office artifact inspection: {args.path}",
+            thread_id=args.thread_id,
+            metadata={"workroom": args.workroom, "path": args.path},
+            approval_required=False,
+        )
+        return append_and_print(store, event)
+
+    if args.office_command == "convert":
+        event = make_plane_event(
+            plane="prophet-workspace",
+            kind="office_artifact_request",
+            channel=args.channel,
+            sender=args.sender,
+            body=f"Request Office conversion to {args.to_format}: {args.path}",
+            thread_id=args.thread_id,
+            metadata={"workroom": args.workroom, "path": args.path, "target_format": args.to_format},
+            approval_required=True,
+        )
+        return append_and_print(store, event)
+
+    raise SystemExit(f"unknown office command: {args.office_command}")
 
 
 def cmd_shell(store: EventStore) -> int:
@@ -584,6 +655,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_request_shell(store, args)
         if args.command == "sherlock-packet":
             return cmd_sherlock_packet(store, args)
+        if args.command == "office":
+            return cmd_office(store, args)
         if args.command == "shell":
             return cmd_shell(store)
         if args.command == "state-integrity":
